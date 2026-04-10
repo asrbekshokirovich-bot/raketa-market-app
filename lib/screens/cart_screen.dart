@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
 import '../utils/top_toast.dart';
 import '../providers/cart_provider.dart';
 import '../providers/localization_provider.dart';
@@ -12,6 +13,16 @@ class CartScreen extends StatelessWidget {
   final void Function(int, {bool scrollToProducts})? onNavigate;
 
   const CartScreen({super.key, this.onNavigate});
+
+  String _fC(dynamic amountStr) {
+    double amount = double.tryParse(amountStr.toString().replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+    final formatter = NumberFormat("#,###", "en_US");
+    return formatter.format(amount).replaceAll(',', ' ');
+  }
+
+  String _t(BuildContext context, String key, [String fallback = '']) {
+    return context.read<LocalizationProvider>().translate(key);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +251,7 @@ class CartScreen extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        cartItem.subtitle,
+                                        _t(context, cartItem.subtitle.toLowerCase()), // Using lowercase mapped key translations if present
                                         style: GoogleFonts.montserrat(
                                           fontSize: 11,
                                           color: Colors.grey[500],
@@ -262,7 +273,7 @@ class CartScreen extends StatelessWidget {
                                       const SizedBox(height: 2),
                                       if (cartItem.oldPrice != null)
                                         Text(
-                                          cartItem.oldPrice!,
+                                          '${_fC(cartItem.oldPrice)} ${_t(context, 'som')}',
                                           style: GoogleFonts.montserrat(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
@@ -271,7 +282,7 @@ class CartScreen extends StatelessWidget {
                                           ),
                                         ),
                                       Text(
-                                        cartItem.price,
+                                        '${_fC(cartItem.price)} ${_t(context, 'som')}',
                                         style: GoogleFonts.montserrat(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w800,
@@ -287,7 +298,7 @@ class CartScreen extends StatelessWidget {
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(
-                                          '${context.watch<LocalizationProvider>().translate('jami')} ${((double.tryParse(cartItem.price.replaceAll(' so\'m', '').replaceAll(' ', '')) ?? 0.0) * cartItem.quantity).toInt().toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]} ")} so\'m',
+                                          '${_t(context, 'jami')} ${_fC(((double.tryParse(cartItem.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0) * cartItem.quantity).toString())} ${_t(context, 'som')}',
                                           style: GoogleFonts.montserrat(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w900,
@@ -404,7 +415,7 @@ class CartScreen extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${cart.totalAmount.toStringAsFixed(0)} so\'m',
+                            '${_fC(cart.totalAmount)} ${_t(context, 'som')}',
                             style: GoogleFonts.montserrat(
                               fontSize: 22,
                               fontWeight: FontWeight.w800,

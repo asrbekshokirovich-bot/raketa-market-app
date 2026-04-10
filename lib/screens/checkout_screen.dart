@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import '../widgets/top_notification.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
@@ -28,13 +29,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   
   Timer? _debounce;
   String _geocodedAddress = '';
+  String _coordinateString = '';
   LatLng _currentMapPosition = const LatLng(41.2995, 69.2401);
+
+  String _fC(double amount) {
+    final formatter = NumberFormat("#,###", "en_US");
+    return formatter.format(amount).replaceAll(',', ' ');
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_geocodedAddress.isEmpty) {
       _geocodedAddress = context.read<LocalizationProvider>().translate('searching_address');
+    }
+    if (_coordinateString.isEmpty) {
+      _coordinateString = '41.2995, 69.2401';
     }
   }
 
@@ -57,7 +67,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (mounted) {
           setState(() {
             _geocodedAddress = parts.isNotEmpty ? parts.join(', ') : context.read<LocalizationProvider>().translate('unknown_area');
-            _geocodedAddress += '\n(Koord: ${coords.latitude.toStringAsFixed(4)}, ${coords.longitude.toStringAsFixed(4)})';
+            _coordinateString = '${coords.latitude.toStringAsFixed(5)}, ${coords.longitude.toStringAsFixed(5)}';
           });
         }
       } else {
@@ -203,11 +213,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -312,7 +326,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     style: GoogleFonts.montserrat(
                       fontSize: 13,
                       fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                      color: isSelected ? const Color(0xFFFF7A00) : (isDark ? Colors.white : Colors.black87),
+                      color: isDark ? Colors.white : Colors.black87,
                     ),
                   ),
                   if (badge != null) ...[
@@ -353,7 +367,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final total = subTotal - _discountAmount;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF9FAFB),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF3F4F6),
       appBar: AppBar(
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 0,
@@ -403,7 +417,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ], isDark),
 
                   // Address Info (Conditional)
-                  if (_deliveryMethod == 'delivery')
+                  if (_deliveryMethod == 'delivery') ...[
                     _buildCard([
                       _buildSectionTitle(context.watch<LocalizationProvider>().translate('your_address'), isDark),
                       Container(
@@ -439,6 +453,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     setState(() {
                                       _currentMapPosition = camera.center;
                                       _geocodedAddress = context.read<LocalizationProvider>().translate('searching_address');
+                                      _coordinateString = '${camera.center.latitude.toStringAsFixed(5)}, ${camera.center.longitude.toStringAsFixed(5)}';
                                     });
                                     _debounce = Timer(const Duration(milliseconds: 1500), () {
                                       _fetchAddressInfo(camera.center);
@@ -526,6 +541,55 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ],
                         ),
                       ),
+                      // Coordinate Box
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 0),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFF007AFF).withOpacity(0.3),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF007AFF).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.my_location_rounded, color: Color(0xFF007AFF), size: 24),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                _coordinateString,
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ], isDark),
+
+                    // Courier description separate part
+                    _buildCard([
+                      _buildSectionTitle(context.watch<LocalizationProvider>().translate('courier_desc'), isDark),
                       _buildTextField(
                         label: context.watch<LocalizationProvider>().translate('courier_desc'),
                         hint: context.watch<LocalizationProvider>().translate('courier_desc_hint'),
@@ -534,6 +598,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         isDark: isDark,
                       ),
                     ], isDark),
+                  ],
 
                   // Pickup Store Address (Conditional)
                   if (_deliveryMethod == 'pickup')
@@ -918,7 +983,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(context.watch<LocalizationProvider>().translate('products_label'), style: GoogleFonts.montserrat(color: Colors.grey[500], fontWeight: FontWeight.w600)),
-                      Text('${cart.totalAmount.toStringAsFixed(0)} so\'m', style: GoogleFonts.montserrat(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+                      Text('${_fC(cart.totalAmount)} ${context.watch<LocalizationProvider>().translate('som')}', style: GoogleFonts.montserrat(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -926,7 +991,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(context.watch<LocalizationProvider>().translate('delivery_fee'), style: GoogleFonts.montserrat(color: Colors.grey[500], fontWeight: FontWeight.w600)),
-                      Text(_deliveryMethod == 'delivery' ? '15000 so\'m' : context.watch<LocalizationProvider>().translate('free'), style: GoogleFonts.montserrat(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+                      Text(_deliveryMethod == 'delivery' ? '${_fC(15000)} ${context.watch<LocalizationProvider>().translate('som')}' : context.watch<LocalizationProvider>().translate('free'), style: GoogleFonts.montserrat(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
                     ],
                   ),
                   if (_isPromoApplied) ...[
@@ -935,7 +1000,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(context.watch<LocalizationProvider>().translate('discount_label'), style: GoogleFonts.montserrat(color: Colors.green, fontWeight: FontWeight.w600)),
-                        Text('- ${_discountAmount.toStringAsFixed(0)} so\'m', style: GoogleFonts.montserrat(fontWeight: FontWeight.w700, color: Colors.green)),
+                        Text('- ${_fC(_discountAmount)} ${context.watch<LocalizationProvider>().translate('som')}', style: GoogleFonts.montserrat(fontWeight: FontWeight.w700, color: Colors.green)),
                       ],
                     ),
                   ],
@@ -952,7 +1017,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         children: [
                           if (_isPromoApplied)
                             Text(
-                              '${subTotal.toStringAsFixed(0)} so\'m',
+                              '${_fC(subTotal)} ${context.watch<LocalizationProvider>().translate('som')}',
                               style: GoogleFonts.montserrat(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -961,7 +1026,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ),
                             ),
                           Text(
-                            '${total.toStringAsFixed(0)} so\'m',
+                            '${_fC(total)} ${context.watch<LocalizationProvider>().translate('som')}',
                             style: GoogleFonts.montserrat(
                               fontSize: 20,
                               fontWeight: FontWeight.w900,

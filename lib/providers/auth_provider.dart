@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../services/supabase_service.dart';
+import '../main.dart';
 
 class AuthProvider with ChangeNotifier {
   Map<String, dynamic>? _userProfile;
@@ -26,6 +27,7 @@ class AuthProvider with ChangeNotifier {
       // Ma'lumotlarni bazadan yangilab qo'yamiz (agar o'zgargan bo'lsa)
       if (_userProfile?['phone'] != null) {
         refreshProfile(_userProfile!['phone']);
+        _syncActiveOrdersCount();
       }
     } else {
       notifyListeners();
@@ -106,6 +108,7 @@ class AuthProvider with ChangeNotifier {
       if (_userProfile != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('current_user', json.encode(_userProfile));
+        _syncActiveOrdersCount();
       }
 
       _isLoading = false;
@@ -144,11 +147,34 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<void> _syncActiveOrdersCount() async {
+    try {
+      final orders = await SupabaseService.fetchOrders('');
+      int activeCount = 0;
+      for (var raw in orders) {
+        final String? status = raw['status'];
+        if (status == null) continue;
+        final s = status.toLowerCase();
+        int step = 0;
+        if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') step = 1;
+        else if (s == 'packed' || s.contains('tayyor')) step = 2;
+        else if (s.contains('yo\'lda') || s == 'delivering') step = 3;
+        else if (s.contains('yetkazildi') || s == 'delivered') step = 4;
+        
+        if (step < 4) activeCount++;
+      }
+      newOrdersCountNotifier.value = activeCount;
+    } catch(e) {
+      debugPrint('Sync orders count error: $e');
+    }
+  }
+
   // Tizimdan chiqish
   Future<void> signOut() async {
     _userProfile = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('current_user');
+    newOrdersCountNotifier.value = 0;
     notifyListeners();
   }
 }

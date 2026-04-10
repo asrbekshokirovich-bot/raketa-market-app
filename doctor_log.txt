@@ -1,0 +1,10 @@
+Waiting for another flutter command to release the startup lock...
+[√] Flutter (Channel stable, 3.41.5, on Microsoft Windows [Version 10.0.26200.7840], locale en-US) [5.6s]
+    • Flutter version 3.41.5 on channel stable at C:\src\flutter
+    • Upstream repository https://github.com/flutter/flutter.git
+    • Framework revision 2c9eb20739 (3 weeks ago), 2026-03-17 16:14:01 -0700
+    • Engine revision 052f31d115
+    • Dart version 3.11.3
+    • DevTools version 2.54.2
+    • Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop, enable-android, enable-ios, cli-animations, enable-native-assets, omit-legacy-version-file, enable-lldb-debugging, enable-uiscene-migration
+

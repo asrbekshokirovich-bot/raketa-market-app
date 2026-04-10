@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:ui';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:provider/provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/localization_provider.dart';
+import 'providers/favorites_provider.dart';
 import 'screens/splash_screen.dart';
 import 'services/supabase_service.dart';
 
@@ -22,11 +24,20 @@ Future<void> main() async {
     debugPrint('Supabase initialize error: $e');
   }
 
+  final prefs = await SharedPreferences.getInstance();
+  final isDark = prefs.getBool('is_dark') ?? false;
+  themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
+  
+  themeNotifier.addListener(() {
+    prefs.setBool('is_dark', themeNotifier.value == ThemeMode.dark);
+  });
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => LocalizationProvider()..loadLanguage()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => FavoritesProvider()),
         ChangeNotifierProxyProvider<AuthProvider, CartProvider>(
           create: (_) => CartProvider(),
           update: (_, auth, cart) {
@@ -37,7 +48,7 @@ Future<void> main() async {
         ),
       ],
       child: DevicePreview(
-        enabled: !kReleaseMode,
+        enabled: true,
         builder: (context) => const SupermarketApp(),
       ),
     ),

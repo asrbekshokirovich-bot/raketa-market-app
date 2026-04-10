@@ -485,7 +485,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         child: Text(
-                          product['discountBadge'] ?? '',
+                          (product['discountBadge'] ?? '').toString().replaceAll('CHEGIRMA', context.watch<LocalizationProvider>().translate('chegirma')),
                           style: GoogleFonts.montserrat(
                             color: Colors.white,
                             fontSize: 10,
@@ -534,7 +534,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       if (isDiscounted)
                         Text(
-                          product['oldPrice'] ?? '',
+                          (product['oldPrice'] ?? '').toString().replaceAll("so'm", context.watch<LocalizationProvider>().translate('som')),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -548,7 +548,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    product['price'] ?? '',
+                    (product['price'] ?? '').toString().replaceAll("so'm", context.watch<LocalizationProvider>().translate('som')),
                     style: GoogleFonts.montserrat(
                       fontWeight: FontWeight.w800,
                       fontSize: 14,

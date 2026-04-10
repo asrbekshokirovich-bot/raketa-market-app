@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'profile_edit_screen.dart';
 import 'orders_screen.dart';
 import 'addresses_screen.dart';
+import 'favorites_screen.dart';
 import 'support_screen.dart';
 import 'about_screen.dart';
 import 'splash_screen.dart';
@@ -444,6 +445,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: context.watch<LocalizationProvider>().translate('mening_manzilim'),
                 isDark: isDark,
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AddressesScreen())),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Divider(height: 1),
+              ),
+              _buildMenuItem(
+                context: context,
+                icon: Icons.favorite_rounded,
+                title: context.watch<LocalizationProvider>().translate('sevimlilar'),
+                isDark: isDark,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FavoritesScreen())),
               ),
             ],
             isDark,

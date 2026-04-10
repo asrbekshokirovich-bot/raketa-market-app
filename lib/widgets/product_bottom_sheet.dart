@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/cart_provider.dart';
 import '../providers/localization_provider.dart';
+import '../providers/favorites_provider.dart';
 import '../widgets/top_notification.dart';
 Widget _buildImage(bool isDark, String? imagePath) {
   if (imagePath == null) return _buildPlaceholderImage(isDark);
@@ -245,9 +246,31 @@ class _ProductBottomSheetContentState extends State<_ProductBottomSheetContent> 
                           ),
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.favorite_border),
-                        onPressed: () {},
+                      Consumer<FavoritesProvider>(
+                        builder: (context, favorites, child) {
+                          final productId = product['product_id']?.toString() ?? product['id']?.toString() ?? product['title'] ?? 'default_id';
+                          final bool isFavorite = favorites.isFavorite(productId);
+                          return IconButton(
+                            icon: Icon(
+                              isFavorite ? Icons.favorite : Icons.favorite_border,
+                              color: isFavorite ? const Color(0xFFE50914) : (isDark ? Colors.grey[400] : Colors.black87),
+                              size: 28,
+                            ),
+                            onPressed: () {
+                              favorites.toggleFavorite(
+                                productId: productId,
+                                title: product['title'] ?? '',
+                                subtitle: product['subtitle'] ?? '',
+                                price: product['price'] ?? '',
+                                oldPrice: product['oldPrice'],
+                                imagePath: product['image'] ?? 'assets/images/placeholder.png',
+                                images: images.map((e) => e.toString()).toList(),
+                                discountBadge: product['discountBadge'],
+                                unit: product['unit'] ?? 'ta',
+                              );
+                            },
+                          );
+                        },
                       ),
                     ],
                   ),

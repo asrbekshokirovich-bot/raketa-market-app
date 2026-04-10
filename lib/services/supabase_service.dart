@@ -48,17 +48,16 @@ class SupabaseService {
       }
       final userId = json.decode(userJson)['id'];
 
-      // 1. Joriy foydalanuvchining avvalgi buyurtmalari sonini hisoblash
+      // 1. Kompaniyadagi jami barcha avvalgi buyurtmalar sonini (Global) hisoblash
       final countResponse = await client
           .from('orders')
-          .select('id')
-          .eq('user_id', userId);
+          .select('id');
       
       final previousCount = (countResponse as List).length;
       final int newOrderIndex = previousCount + 1;
       
       final random5Digit = Random().nextInt(90000) + 10000;
-      final orderNumber = 'No-$newOrderIndex • #RM-$random5Digit';
+      final orderNumber = 'No-$newOrderIndex • #ID-$random5Digit';
       final courierCodeGenerated = (Random().nextInt(90000) + 10000).toString();
       
       // 2. Orders jadvaliga kiritish va qaytib kelgan ID ni olish

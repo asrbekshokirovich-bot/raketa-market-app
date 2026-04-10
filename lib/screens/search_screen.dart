@@ -570,7 +570,10 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off_outlined, size: 80, color: Colors.grey[400]),
+          Transform.rotate(
+            angle: 3.14159, // Pointing downwards indicating idle or no results
+            child: Icon(Icons.rocket_launch_outlined, size: 80, color: Colors.grey[400]),
+          ),
           const SizedBox(height: 16),
           Text(
             message,
@@ -675,7 +678,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           ],
                         ),
                         child: Text(
-                          product['discountBadge'] ?? '',
+                          (product['discountBadge'] ?? '').toString().replaceAll('CHEGIRMA', context.watch<LocalizationProvider>().translate('chegirma')),
                           style: GoogleFonts.montserrat(
                             color: Colors.white,
                             fontSize: 10,
@@ -722,7 +725,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                       if (isDiscounted)
                         Text(
-                          product['oldPrice'] ?? '',
+                          (product['oldPrice'] ?? '').toString().replaceAll("so'm", context.watch<LocalizationProvider>().translate('som')),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -736,7 +739,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    product['price'] ?? '',
+                    (product['price'] ?? '').toString().replaceAll("so'm", context.watch<LocalizationProvider>().translate('som')),
                     style: GoogleFonts.montserrat(
                       fontWeight: FontWeight.w800,
                       fontSize: 14,
