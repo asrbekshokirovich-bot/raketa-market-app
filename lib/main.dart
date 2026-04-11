@@ -37,7 +37,14 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => LocalizationProvider()..loadLanguage()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => FavoritesProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, FavoritesProvider>(
+          create: (_) => FavoritesProvider(),
+          update: (_, auth, favorites) {
+            final resultFavorites = favorites ?? FavoritesProvider();
+            resultFavorites.updateUserId(auth.userProfile?['id']?.toString());
+            return resultFavorites;
+          },
+        ),
         ChangeNotifierProxyProvider<AuthProvider, CartProvider>(
           create: (_) => CartProvider(),
           update: (_, auth, cart) {

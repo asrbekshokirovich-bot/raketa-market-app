@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/localization_provider.dart';
 import 'category_products_screen.dart';
 import 'search_screen.dart';
+import 'announcements_screen.dart';
 
 import '../main.dart';
 import '../widgets/product_bottom_sheet.dart';
@@ -27,18 +29,36 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey _productsKey = GlobalKey();
+  final GlobalKey<_AutoScrollingBannersState> _bannersKey = GlobalKey<_AutoScrollingBannersState>();
   List<Map<String, dynamic>> _products = [];
   List<Map<String, dynamic>> _newProducts = [];
   bool _isLoading = true;
+  int _unreadAnnouncements = 0;
 
   @override
   void initState() {
     super.initState();
     _fetchProducts();
+    _checkUnreadAnnouncements();
+  }
+
+  Future<void> _checkUnreadAnnouncements() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastSeenCount = prefs.getInt('last_seen_announcements_count') ?? 0;
+    
+    final allAnnouncements = await SupabaseService.fetchAnnouncements();
+    final total = allAnnouncements.length;
+    
+    if (mounted) {
+      setState(() {
+        _unreadAnnouncements = total > lastSeenCount ? (total - lastSeenCount) : 0;
+      });
+    }
   }
 
   Future<void> _fetchProducts() async {
     try {
+      _bannersKey.currentState?.reloadBanners();
       final response = await SupabaseService.client
           .from('product_listings')
           .select()
@@ -226,6 +246,20 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: _unreadAnnouncements > 0
+                ? Badge(
+                    label: Text('$_unreadAnnouncements'),
+                    backgroundColor: const Color(0xFFE50914), // Red tag
+                    child: const Icon(Icons.notifications_none, size: 28),
+                  )
+                : const Icon(Icons.notifications_none, size: 28),
+            color: isDark ? Colors.white : Colors.black87,
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const AnnouncementsScreen()));
+              _checkUnreadAnnouncements(); // Refresh count after checking
+            },
+          ),
           ValueListenableBuilder<ThemeMode>(
             valueListenable: themeNotifier,
             builder: (context, currentMode, child) {
@@ -246,7 +280,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _fetchProducts,
+        onRefresh: () async {
+          _checkUnreadAnnouncements();
+          await _fetchProducts();
+        },
         color: const Color(0xFFFF7A00),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -294,10 +331,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            // Banners (Ertaga Backend API ga ulanishga tayyor holatda Model ro'yxati)
-            const SizedBox(
-              height: 170, // Increased height for dots
-              child: _AutoScrollingBanners(),
+            // Banners (16:9 Aspect Ratio)
+            SizedBox(
+              height: 220, // Increased height for 16:9 proportion (197 + dots padding)
+              child: _AutoScrollingBanners(key: _bannersKey),
             ),
             // Categories (Barcha 12 ta kategoryani ko'rsatamiz - Sync with Catalog)
             Padding(
@@ -608,43 +645,40 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _AutoScrollingBanners extends StatefulWidget {
-  const _AutoScrollingBanners();
+  const _AutoScrollingBanners({super.key});
 
   @override
   State<_AutoScrollingBanners> createState() => _AutoScrollingBannersState();
 }
 
 class _AutoScrollingBannersState extends State<_AutoScrollingBanners> {
-  // Use a large initial page to allow "infinite" scrolling in both directions
   final PageController _pageController = PageController(initialPage: 1000, viewportFraction: 0.9);
   Timer? _timer;
   int _currentPage = 1000;
-
-  final List<Map<String, String>> serverBanners = [
-    {
-      "title": "aksiya_1",
-      "subtitle": "aksiya_1_subtitle",
-      "color": "0xFFFF7A00"
-    },
-    {
-      "title": "yangi_maxsulotlar",
-      "subtitle": "yangi_maxsulotlar_subtitle",
-      "color": "0xFFFF9D42"
-    },
-    {
-      "title": "bepul_yetkazish",
-      "subtitle": "bepul_yetkazish_subtitle",
-      "color": "0xFFFF7A00"
-    },
-  ];
+  List<Map<String, dynamic>> _banners = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    reloadBanners();
+  }
+
+  Future<void> reloadBanners() async {
+    final banners = await SupabaseService.fetchBanners();
+    if (mounted) {
+      setState(() {
+        _banners = banners;
+        _isLoading = false;
+      });
+      _startTimer();
+    }
+  }
+
+  void _startTimer() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
       _timer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
-        if (!mounted || !_pageController.hasClients) {
+        if (!mounted || !_pageController.hasClients || _banners.isEmpty) {
           timer.cancel();
           return;
         }
@@ -665,6 +699,19 @@ class _AutoScrollingBannersState extends State<_AutoScrollingBanners> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.0),
+          child: CircularProgressIndicator(color: Color(0xFFFF7A00)),
+        ),
+      );
+    }
+    
+    if (_banners.isEmpty) {
+      return const SizedBox.shrink(); // Hide banners if there are none
+    }
+
     return Column(
       children: [
         Expanded(
@@ -676,8 +723,10 @@ class _AutoScrollingBannersState extends State<_AutoScrollingBanners> {
               });
             },
             itemBuilder: (context, index) {
-              final realIndex = index % serverBanners.length;
-              final banner = serverBanners[realIndex];
+              final realIndex = index % _banners.length;
+              final banner = _banners[realIndex];
+              final imageUrl = banner['image_url'] ?? banner['image'] ?? banner['url'];
+              
               return AnimatedBuilder(
                 animation: _pageController,
                 builder: (context, child) {
@@ -690,7 +739,7 @@ class _AutoScrollingBannersState extends State<_AutoScrollingBanners> {
                   }
                   return Center(
                     child: SizedBox(
-                      height: Curves.easeOut.transform(value) * 150,
+                      height: Curves.easeOut.transform(value) * 197, // 16:9 aspect ratio
                       width: Curves.easeOut.transform(value) * 350,
                       child: child,
                     ),
@@ -698,9 +747,8 @@ class _AutoScrollingBannersState extends State<_AutoScrollingBanners> {
                 },
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
-                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Color(int.parse(banner["color"]!)),
+                    color: Colors.grey[200],
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: const [
                       BoxShadow(
@@ -710,34 +758,27 @@ class _AutoScrollingBannersState extends State<_AutoScrollingBanners> {
                       )
                     ]
                   ),
-                  child: Center(
-                    child: SingleChildScrollView(
-                      physics: const NeverScrollableScrollPhysics(),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            context.watch<LocalizationProvider>().translate(banner["title"]!),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            context.watch<LocalizationProvider>().translate(banner["subtitle"]!),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Builder(builder: (context) {
+                      if (imageUrl == null || imageUrl.toString().isEmpty) {
+                        return Container(color: const Color(0xFFFF7A00));
+                      }
+                      return CachedNetworkImage(
+                        imageUrl: imageUrl.toString(),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[300],
+                          child: const Center(child: CircularProgressIndicator(color: Color(0xFFFF7A00), strokeWidth: 2)),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: const Color(0xFFFF7A00),
+                          child: const Center(child: Icon(Icons.broken_image, color: Colors.white54, size: 40)),
+                        ),
+                      );
+                    }),
                   ),
                 ),
               );
@@ -748,8 +789,8 @@ class _AutoScrollingBannersState extends State<_AutoScrollingBanners> {
         // Dots Indicator
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(serverBanners.length, (index) {
-            final isActive = (_currentPage % serverBanners.length) == index;
+          children: List.generate(_banners.length, (index) {
+            final isActive = (_currentPage % _banners.length) == index;
             return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               margin: const EdgeInsets.symmetric(horizontal: 4),

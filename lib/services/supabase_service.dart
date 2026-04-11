@@ -23,6 +23,30 @@ class SupabaseService {
     await prefs.setString('customer_phone', phone);
   }
 
+  // Ilovaning umumiy sozlamalarini (Support phone, Telegram) tortib olish
+  static Future<Map<String, String>> getAppSettings() async {
+    try {
+      final response = await client.from('app_settings').select();
+      
+      Map<String, String> settings = {};
+      for (var item in response) {
+        if (item.containsKey('key') && item.containsKey('value')) {
+          settings[item['key'].toString()] = item['value'].toString();
+        } else if (item.containsKey('name') && item.containsKey('value')) {
+          settings[item['name'].toString()] = item['value'].toString();
+        }
+      }
+      
+      print('=== Fetched App Settings ===');
+      print(settings);
+      
+      return settings;
+    } catch (e) {
+      print('Xatolik: app_settings jadvalini tortishda muammo - $e');
+      return {};
+    }
+  }
+
   static Future<Map<String, String?>> getCustomerInfo() async {
     final prefs = await SharedPreferences.getInstance();
     return {
@@ -168,4 +192,129 @@ class SupabaseService {
       print('Savatni tozalashda xatolik: $e');
     }
   }
+
+  // Sevimlilarni yuklash
+  static Future<List<Map<String, dynamic>>> getFavoriteItems(String userId) async {
+    try {
+      final favoriteRows = await client
+          .from('favorite_items')
+          .select()
+          .eq('user_id', userId);
+          
+      if ((favoriteRows as List).isEmpty) return [];
+
+      final productIds = favoriteRows.map((e) => e['product_id']).toList();
+
+      final products = await client
+          .from('product_listings')
+          .select()
+          .filter('id', 'in', productIds);
+
+      List<Map<String, dynamic>> result = [];
+      for (var fRow in favoriteRows) {
+        final matches = (products as List).where((p) => p['id'] == fRow['product_id']);
+        
+        if (matches.isNotEmpty) {
+          final product = matches.first;
+          final mappedRow = Map<String, dynamic>.from(fRow);
+          mappedRow['product_listings'] = product;
+          result.add(mappedRow);
+        }
+      }
+      return result;
+    } catch (e) {
+      print('Sevimlilarni yuklashda xatolik: $e');
+      return [];
+    }
+  }
+
+  // Sevimlilarni qo'shish
+  static Future<void> addFavorite(String userId, String productId) async {
+    try {
+      await client.from('favorite_items').upsert({
+        'user_id': userId,
+        'product_id': productId,
+      }, onConflict: 'user_id, product_id');
+    } catch (e) {
+      print('Sevimlilarga qo\'shishda xatolik: $e');
+    }
+  }
+
+  // Sevimlilardan o'chirish
+  static Future<void> removeFavorite(String userId, String productId) async {
+    try {
+      await client
+          .from('favorite_items')
+          .delete()
+          .eq('user_id', userId)
+          .eq('product_id', productId);
+    } catch (e) {
+      print('Sevimlilardan o\'chirishda xatolik: $e');
+    }
+  }
+
+  // Bannerlarni yuklash
+  static Future<List<Map<String, dynamic>>> fetchBanners() async {
+    try {
+      final response = await client
+          .from('banners')
+          .select()
+          .order('sort_order', ascending: true); // CRM dagi 1,2,3 ketma ketlik uchun
+      
+      print('=== BANNERS DEBUG: $response ===');
+      
+      final List<Map<String, dynamic>> banners = List<Map<String, dynamic>>.from(response);
+      final filteredBanners = banners.where((b) {
+        if (!b.containsKey('status') && !b.containsKey('is_active')) return true;
+        final status = (b['status'] ?? b['is_active'])?.toString().toLowerCase();
+        return status == 'active' || status == 'faol' || status == 'true' || b['status'] == true || b['is_active'] == true || status == '1';
+      }).toList();
+      
+      print('=== FILTERED BANNERS COUNT: ${filteredBanners.length} ===');
+      return filteredBanners;
+    } catch (e) {
+      print('Bannerlarni yuklashda xatolik: $e');
+      return [];
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchAnnouncements() async {
+    try {
+      final response = await client
+          .from('announcements')
+          .select()
+          .order('created_at', ascending: false);
+      
+      final List<Map<String, dynamic>> result = [];
+      for (var row in response) {
+        // Fallback robust mapping
+        final type = (row['type'] ?? row['media_type'] ?? row['post_type'] ?? 'text').toString().toLowerCase();
+        final content = (row['content'] ?? row['text'] ?? row['message'] ?? row['caption'] ?? '').toString();
+        final mediaUrl = (row['media_url'] ?? row['url'] ?? row['image_url'] ?? row['video_url'] ?? '').toString();
+        
+        String timeStr = '';
+        String dateStr = '';
+        if (row['created_at'] != null) {
+          final dt = DateTime.parse(row['created_at'].toString()).toLocal();
+          timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+          dateStr = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+        }
+
+        result.add({
+          'id': row['id'] ?? 0,
+          'type': type.contains('video') ? 'video' : (type.contains('image') || type.contains('photo') || mediaUrl.contains('.jpg') || mediaUrl.contains('.png') || mediaUrl.contains('.jpeg')) ? 'image' : 'text',
+          'media_url': mediaUrl,
+          'content': content,
+          'timestamp': timeStr,
+          'date': dateStr,
+        });
+      }
+      return result;
+    } catch (e) {
+      print('=== ANNOUNCEMENTS FETCH ERROR: $e ===');
+      return [];
+    }
+  }
+
 }
+

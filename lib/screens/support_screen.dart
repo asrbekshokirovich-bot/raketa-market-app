@@ -3,13 +3,45 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/localization_provider.dart';
 import '../utils/top_toast.dart';
+import '../services/supabase_service.dart';
 
-class SupportScreen extends StatelessWidget {
+class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
 
+  @override
+  State<SupportScreen> createState() => _SupportScreenState();
+}
+
+class _SupportScreenState extends State<SupportScreen> {
+  Map<String, String> _appSettings = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSettings();
+  }
+
+  Future<void> _fetchSettings() async {
+    final settings = await SupabaseService.getAppSettings();
+    if (mounted) {
+      setState(() {
+        _appSettings = settings;
+      });
+    }
+  }
+
   void _showLaunchSheet(BuildContext context, bool isDark, String type) {
+    // Dynamic values check. You can fallback to default if cloud is empty or key not found
+    String desc = '';
+    if (type == 'telegram') {
+      desc = _appSettings['contact_telegram'] ?? _appSettings['telegram_support'] ?? "@raketamarket_admin";
+      if (!desc.startsWith('@') && !desc.contains('t.me/')) desc = '@$desc';
+    } else {
+      String rawPhone = _appSettings['contact_phone'] ?? _appSettings['phone_support'] ?? "90 123 45 67";
+      desc = rawPhone.startsWith('+') ? rawPhone : '+998 $rawPhone';
+    }
+
     final title = type == 'telegram' ? context.read<LocalizationProvider>().translate('via_telegram') : context.read<LocalizationProvider>().translate('via_phone');
-    final desc = type == 'telegram' ? "@raketamarket_admin" : "+998 90 123 45 67";
     final icon = type == 'telegram' ? Icons.telegram : Icons.phone_rounded;
     final color = type == 'telegram' ? Colors.blue : Colors.green;
     final buttonText = type == 'telegram' ? context.read<LocalizationProvider>().translate('send_msg') : context.read<LocalizationProvider>().translate('via_phone');
@@ -46,9 +78,13 @@ class SupportScreen extends StatelessWidget {
                 Expanded(
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: Text(context.read<LocalizationProvider>().translate('support_cancel'), style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(context.read<LocalizationProvider>().translate('support_cancel'), style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -61,7 +97,10 @@ class SupportScreen extends StatelessWidget {
                       Navigator.pop(context);
                       TopToast.show(context, context.read<LocalizationProvider>().translate('redirecting'), color: const Color(0xFFFF7A00), icon: Icons.open_in_new_rounded);
                     },
-                    child: Text(buttonText, style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, color: Colors.white)),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(buttonText, style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
                   ),
                 ),
               ],

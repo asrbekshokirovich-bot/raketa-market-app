@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/supabase_service.dart';
 
 class FavoriteItem {
   final String id;
@@ -52,8 +53,7 @@ class FavoriteItem {
 
 class FavoritesProvider with ChangeNotifier {
   Map<String, FavoriteItem> _items = {};
-  SharedPreferences? _prefs;
-  static const String _storageKey = 'favorite_items_v1';
+  String? _userId;
 
   Map<String, FavoriteItem> get items => {..._items};
 
@@ -64,34 +64,86 @@ class FavoritesProvider with ChangeNotifier {
   }
 
   FavoritesProvider() {
-    _initPrefs();
+    _loadFavorites();
   }
 
-  Future<void> _initPrefs() async {
-    _prefs = await SharedPreferences.getInstance();
-    await _loadFromLocal();
-  }
-
-  Future<void> _loadFromLocal() async {
-    if (_prefs == null) return;
-    
-    final storedData = _prefs!.getString(_storageKey);
-    if (storedData != null) {
-      final decodedData = json.decode(storedData) as Map<String, dynamic>;
-      _items = decodedData.map(
-        (key, value) => MapEntry(key, FavoriteItem.fromJson(value)),
-      );
-      notifyListeners();
+  Future<void> _loadFavorites() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!prefs.containsKey('favoritesData')) return;
+      
+      final String? encodedData = prefs.getString('favoritesData');
+      if (encodedData == null) return;
+      
+      final List<dynamic> decodedData = json.decode(encodedData);
+      _items = {};
+      for (var item in decodedData) {
+        _items[item['key']] = FavoriteItem.fromJson(item['value']);
+      }
+      Future.microtask(() => notifyListeners());
+    } catch (e) {
+      debugPrint('Error loading local favorites: $e');
     }
   }
 
-  Future<void> _saveToLocal() async {
-    if (_prefs == null) return;
+  Future<void> _saveFavorites() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String encodedData = json.encode(
+        _items.entries.map((e) => {"key": e.key, "value": e.value.toJson()}).toList()
+      );
+      await prefs.setString('favoritesData', encodedData);
+    } catch (e) {
+      debugPrint('Error saving local favorites: $e');
+    }
+  }
+
+  void updateUserId(String? newId) {
+    if (_userId != newId) {
+      _userId = newId;
+      if (_userId != null) {
+        Future.microtask(() => fetchFavorites());
+      } else {
+        Future.microtask(() {
+          _items.clear();
+          _saveFavorites();
+          notifyListeners();
+        });
+      }
+    }
+  }
+
+  Future<void> fetchFavorites() async {
+    if (_userId == null) return;
     
-    final encodedData = json.encode(
-      _items.map((key, value) => MapEntry(key, value.toJson())),
-    );
-    await _prefs!.setString(_storageKey, encodedData);
+    try {
+      final data = await SupabaseService.getFavoriteItems(_userId!);
+      
+      final Map<String, FavoriteItem> loadedItems = {};
+      for (var favoriteRow in data) {
+        final product = favoriteRow['product_listings'];
+        if(product != null) {
+          final productId = favoriteRow['product_id'];
+          
+          loadedItems[productId] = FavoriteItem(
+            id: productId,
+            title: product['name'] ?? '',
+            subtitle: product['category'] ?? '',
+            price: "${product['price']} so'm",
+            oldPrice: product['old_price']?.toString(),
+            imagePath: product['image_url'] ?? 'assets/images/placeholder.png',
+            images: product['images'] != null ? List<String>.from(product['images']) : [],
+            discountBadge: product['discount_badge'],
+            unit: product['unit'] ?? 'dona',
+          );
+        }
+      }
+      _items = loadedItems;
+      _saveFavorites();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error fetching favorites: $e');
+    }
   }
 
   void toggleFavorite({
@@ -107,6 +159,9 @@ class FavoritesProvider with ChangeNotifier {
   }) {
     if (_items.containsKey(productId)) {
       _items.remove(productId);
+      if (_userId != null) {
+         SupabaseService.removeFavorite(_userId!, productId);
+      }
     } else {
       _items.putIfAbsent(
         productId,
@@ -122,14 +177,17 @@ class FavoritesProvider with ChangeNotifier {
           unit: unit,
         ),
       );
+      if (_userId != null) {
+         SupabaseService.addFavorite(_userId!, productId);
+      }
     }
-    _saveToLocal();
+    _saveFavorites();
     notifyListeners();
   }
 
   void clear() {
     _items.clear();
-    _saveToLocal();
+    _saveFavorites();
     notifyListeners();
   }
 }

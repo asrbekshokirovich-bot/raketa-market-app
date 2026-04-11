@@ -1054,6 +1054,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         }
 
                         setState(() => _isSubmitting = true);
+                        
+                        // DEBUG LOGGING
+                        final selectedItems = cart.items.values.where((item) => item.isSelected).toList();
+                        debugPrint('--- CHECKOUT START ---');
+                        debugPrint('Total Cart Items: ${cart.items.length}');
+                        debugPrint('Selected Items for Order: ${selectedItems.length}');
+                        for (var item in selectedItems) {
+                          debugPrint(' - ID: ${item.id}, Title: ${item.title}, Qty: ${item.quantity}');
+                        }
 
                         try {
                           final success = await SupabaseService.placeOrder(
@@ -1061,7 +1070,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             phone: _phoneController.text,
                             address: _deliveryMethod == 'delivery' ? (_geocodedAddress + "\n" + _addressController.text) : "Samovivoz (Asosiy do'kon)",
                             totalAmount: total,
-                            items: cart.items.values.map((item) => {
+                            items: cart.items.values.where((item) => item.isSelected).map((item) => {
                               'product_id': item.id, // Bu yerda biz ID-ni Home/Category screenlarda mapp qilganmiz
                               'quantity': item.quantity,
                               'price': double.tryParse(item.price.replaceAll(' so\'m', '').replaceAll(' ', '')) ?? 0.0,
@@ -1072,7 +1081,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             if (mounted) {
                               TopNotification.show(context, context.read<LocalizationProvider>().translate('checkout_success'));
                               newOrdersCountNotifier.value += 1;
-                              cart.clear();
+                              cart.clearSelectedItems();
                               Navigator.pop(context); // Go back
                             }
                           } else {

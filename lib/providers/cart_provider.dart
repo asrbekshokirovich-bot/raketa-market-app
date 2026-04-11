@@ -79,21 +79,30 @@ class CartProvider with ChangeNotifier {
       
       final remoteItems = await SupabaseService.getCartItems(_userId!);
       
-      _items.clear();
+      // Yangi ma'lumotlarni yig'amiz, lekin eskilarini isSelected holatini saqlab qolamiz
+      final Map<String, CartItem> newItems = {};
       for (var item in remoteItems) {
         final product = item['product_listings'];
         if (product != null) {
-          _items[product['id']] = CartItem(
-            id: product['id'],
+          final String pId = product['id'];
+          // Agar bizda bu mahsulot allaqachon bo'lsa, uning tanlanganlik holatini saqlaymiz
+          final bool wasSelected = _items.containsKey(pId) ? _items[pId]!.isSelected : true;
+          
+          newItems[pId] = CartItem(
+            id: pId,
             title: product['name'] ?? '',
             subtitle: product['category'] ?? '',
             price: "${product['price']} so'm",
             imagePath: product['image_url'] ?? 'assets/images/placeholder.png',
             unit: product['unit'] ?? 'ta',
             quantity: item['quantity'] ?? 1,
+            isSelected: wasSelected,
           );
         }
       }
+      
+      _items.clear();
+      _items.addAll(newItems);
       notifyListeners();
     } catch (e) {
       debugPrint('❌ CartProvider.loadFromDatabase ERROR: $e');
@@ -228,6 +237,22 @@ class CartProvider with ChangeNotifier {
     if (_userId != null) {
       await SupabaseService.clearCart(_userId!);
     }
+  }
+
+  Future<void> clearSelectedItems() async {
+    // FAQAT Xaridga tanlangan (isSelected = true) narsalarni o'chiramiz
+    final selectedIds = _items.values
+        .where((item) => item.isSelected)
+        .map((item) => item.id)
+        .toList();
+
+    for (final id in selectedIds) {
+      _items.remove(id);
+      if (_userId != null) {
+        await SupabaseService.removeFromCart(_userId!, id);
+      }
+    }
+    notifyListeners();
   }
 
   bool isInCart(String productId) {
