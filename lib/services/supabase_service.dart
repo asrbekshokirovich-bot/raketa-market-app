@@ -316,5 +316,67 @@ class SupabaseService {
     }
   }
 
+  // --- ADDRESS METHODS ---
+
+  // Manzillarni yuklash
+  static Future<List<Map<String, dynamic>>> getUserAddresses(String userId) async {
+    try {
+      final response = await client
+          .from('user_addresses')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Manzillarni yuklashda xatolik: $e');
+      return [];
+    }
+  }
+
+  // Manzilni saqlash (Add/Update)
+  static Future<bool> saveUserAddress(Map<String, dynamic> addressData) async {
+    try {
+      print('=== Saving Address Data: $addressData ===');
+      await client.from('user_addresses').upsert(addressData);
+      return true;
+    } catch (e) {
+      print('!!! Geocoder/Address Error: $e !!!');
+      if (e is PostgrestException) {
+        print('Postgrest Error: ${e.message}, Hint: ${e.hint}, Code: ${e.code}');
+      }
+      return false;
+    }
+  }
+
+  // Manzilni o'chirish
+  static Future<bool> deleteUserAddress(String addressId) async {
+    try {
+      await client.from('user_addresses').delete().eq('id', addressId);
+      return true;
+    } catch (e) {
+      print('Manzilni o\'chirishda xatolik: $e');
+      return false;
+    }
+  }
+
+  // Default manzilni sozlash
+  static Future<void> setDefaultAddress(String userId, String addressId) async {
+    try {
+      // Avval hammasini false qilamiz
+      await client
+          .from('user_addresses')
+          .update({'is_default': false})
+          .eq('user_id', userId);
+      
+      // Tanlanganini true qilamiz
+      await client
+          .from('user_addresses')
+          .update({'is_default': true})
+          .eq('id', addressId);
+    } catch (e) {
+      print('Default manzilni sozlashda xatolik: $e');
+    }
+  }
 }
+
 

@@ -47,6 +47,7 @@ dependencies:
   uuid: ^4.3.3
   video_player: ^2.11.1
   grouped_list: ^6.0.0
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:

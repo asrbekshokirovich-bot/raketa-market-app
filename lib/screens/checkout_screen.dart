@@ -5,8 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'dart:async';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../widgets/top_notification.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +12,10 @@ import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/localization_provider.dart';
 import '../services/supabase_service.dart';
+import '../providers/address_provider.dart';
+import '../services/yandex_service.dart';
+import 'package:geolocator/geolocator.dart';
+import '../utils/map_constants.dart';
 import '../main.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -31,6 +33,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _geocodedAddress = '';
   String _coordinateString = '';
   LatLng _currentMapPosition = const LatLng(41.2995, 69.2401);
+  bool _isMapLoading = false;
 
   String _fC(double amount) {
     final formatter = NumberFormat("#,###", "en_US");
@@ -50,31 +53,52 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _fetchAddressInfo(LatLng coords) async {
     try {
-      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=uz');
-      final response = await http.get(url, headers: {'User-Agent': 'com.abulfayiz.supermarket'});
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final address = data['address'] ?? {};
-        final region = address['region'] ?? address['state'] ?? '';
-        final city = address['city'] ?? address['town'] ?? address['county'] ?? '';
-        final road = address['road'] ?? address['suburb'] ?? address['neighbourhood'] ?? '';
-
-        List<String> parts = [];
-        if (region.isNotEmpty) parts.add(region);
-        if (city.isNotEmpty && city != region) parts.add(city);
-        if (road.isNotEmpty) parts.add(road);
-
-        if (mounted) {
-          setState(() {
-            _geocodedAddress = parts.isNotEmpty ? parts.join(', ') : context.read<LocalizationProvider>().translate('unknown_area');
-            _coordinateString = '${coords.latitude.toStringAsFixed(5)}, ${coords.longitude.toStringAsFixed(5)}';
-          });
-        }
+      final data = await YandexService.reverseGeocode(coords);
+      if (data != null && mounted) {
+        setState(() {
+          _geocodedAddress = data['display_name'] ?? context.read<LocalizationProvider>().translate('unknown_area');
+          _coordinateString = '${coords.latitude.toStringAsFixed(6)}, ${coords.longitude.toStringAsFixed(6)}';
+        });
       } else {
         if (mounted) setState(() => _geocodedAddress = context.read<LocalizationProvider>().translate('cannot_determine_address'));
       }
     } catch (e) {
       if (mounted) setState(() => _geocodedAddress = context.read<LocalizationProvider>().translate('connection_error'));
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isMapLoading = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) TopNotification.show(context, "GPS o'chirilgan", isError: true);
+        setState(() => _isMapLoading = false);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) TopNotification.show(context, "Joylashuvga ruxsat berilmadi", isError: true);
+          setState(() => _isMapLoading = false);
+          return;
+        }
+      }
+
+      Position position = await Geolocator.getCurrentPosition();
+      final coords = LatLng(position.latitude, position.longitude);
+      setState(() {
+        _currentMapPosition = coords;
+        _isMapLoading = false;
+        _coordinateString = '${coords.latitude.toStringAsFixed(6)}, ${coords.longitude.toStringAsFixed(6)}';
+      });
+      _mapController.move(coords, 18.5);
+      _fetchAddressInfo(coords);
+    } catch (e) {
+      if (mounted) TopNotification.show(context, "Joylashuvni aniqlab bo'lmadi", isError: true);
+      setState(() => _isMapLoading = false);
     }
   }
 
@@ -88,6 +112,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _promoController = TextEditingController();
   double _discountAmount = 0;
   bool _isPromoApplied = false;
+
+  AddressItem? _selectedSavedAddress;
 
   bool _isSubmitting = false;
 
@@ -361,6 +387,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = context.read<LocalizationProvider>();
     final cart = context.watch<CartProvider>();
     final deliveryFee = _deliveryMethod == 'delivery' ? 15000.0 : 0.0;
     final subTotal = cart.totalAmount + deliveryFee;
@@ -418,6 +445,68 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                   // Address Info (Conditional)
                   if (_deliveryMethod == 'delivery') ...[
+                    Consumer<AddressProvider>(
+                      builder: (context, addressProvider, child) {
+                        if (addressProvider.addresses.isEmpty) return const SizedBox.shrink();
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionTitle(l10n.translate('my_address'), isDark),
+                            SizedBox(
+                              height: 100,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: addressProvider.addresses.length,
+                                itemBuilder: (context, index) {
+                                  final addr = addressProvider.addresses[index];
+                                  final isSelected = _selectedSavedAddress?.id == addr.id;
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedSavedAddress = addr;
+                                        _geocodedAddress = addr.fullAddress;
+                                        if (addr.lat != null && addr.lng != null) {
+                                          _currentMapPosition = LatLng(addr.lat!, addr.lng!);
+                                          _mapController.move(_currentMapPosition, 18.5);
+                                          _coordinateString = '${addr.lat!.toStringAsFixed(6)}, ${addr.lng!.toStringAsFixed(6)}';
+                                        }
+                                      });
+                                    },
+                                    child: Container(
+                                      width: 160,
+                                      margin: const EdgeInsets.only(right: 12, bottom: 8, top: 4),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? const Color(0xFFFF7A00).withOpacity(0.1) : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: isSelected ? const Color(0xFFFF7A00) : (isDark ? Colors.grey[800]! : Colors.grey[200]!), width: 1.5),
+                                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isSelected ? 0.1 : 0.05), blurRadius: 4, offset: const Offset(0, 2))],
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(isSelected ? Icons.check_circle_rounded : Icons.location_on_rounded, size: 16, color: const Color(0xFFFF7A00)),
+                                              const SizedBox(width: 6),
+                                              Expanded(child: Text(addr.name, style: GoogleFonts.montserrat(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(addr.fullAddress, style: GoogleFonts.montserrat(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                        );
+                      },
+                    ),
                     _buildCard([
                       _buildSectionTitle(context.watch<LocalizationProvider>().translate('your_address'), isDark),
                       Container(
@@ -445,35 +534,45 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             FlutterMap(
                               mapController: _mapController,
                               options: MapOptions(
+                                crs: const CrsYandex(),
                                 initialCenter: _currentMapPosition,
-                                initialZoom: 14.0,
-                                onPositionChanged: (camera, hasGesture) {
-                                  if (hasGesture) {
-                                    if (_debounce?.isActive ?? false) _debounce!.cancel();
-                                    setState(() {
-                                      _currentMapPosition = camera.center;
-                                      _geocodedAddress = context.read<LocalizationProvider>().translate('searching_address');
-                                      _coordinateString = '${camera.center.latitude.toStringAsFixed(5)}, ${camera.center.longitude.toStringAsFixed(5)}';
-                                    });
-                                    _debounce = Timer(const Duration(milliseconds: 1500), () {
-                                      _fetchAddressInfo(camera.center);
-                                    });
-                                  }
+                                initialZoom: 18.5,
+                                onTap: (tapPosition, point) {
+                                  setState(() {
+                                    _selectedSavedAddress = null;
+                                    _currentMapPosition = point;
+                                    _geocodedAddress = context.read<LocalizationProvider>().translate('searching_address');
+                                    _coordinateString = '${point.latitude.toStringAsFixed(6)}, ${point.longitude.toStringAsFixed(6)}';
+                                  });
+                                  if (_debounce?.isActive ?? false) _debounce!.cancel();
+                                  _debounce = Timer(const Duration(milliseconds: 600), () {
+                                    _fetchAddressInfo(point);
+                                  });
                                 },
                               ),
                               children: [
                                 TileLayer(
-                                  urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                                  urlTemplate: 'https://core-renderer-tiles.maps.yandex.net/tiles?l=map&x={x}&y={y}&z={z}&lang=ru_RU',
+                                ),
+                                MarkerLayer(
+                                  markers: [
+                                    Marker(
+                                      point: _currentMapPosition,
+                                      width: 60,
+                                      height: 60,
+                                      child: const Icon(Icons.location_on, color: Color(0xFFFF7A00), size: 40),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            // Center absolute pin overlay
-                            const Center(
-                              child: Padding(
-                                padding: EdgeInsets.only(bottom: 40.0),
-                                child: Icon(Icons.location_on, color: Color(0xFFFF7A00), size: 40),
+                            if (_isMapLoading)
+                              Positioned.fill(
+                                child: Container(
+                                  color: Colors.black.withOpacity(0.1),
+                                  child: const Center(child: CircularProgressIndicator(color: Color(0xFFFF7A00))),
+                                ),
                               ),
-                            ),
                             Positioned(
                               top: 8,
                               right: 8,
@@ -482,9 +581,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 borderRadius: BorderRadius.circular(8),
                                 elevation: 2,
                                 child: InkWell(
-                                  onTap: () {
-                                    _mapController.move(const LatLng(41.2995, 69.2401), 16.0);
-                                  },
+                                  onTap: _getCurrentLocation,
                                   borderRadius: BorderRadius.circular(8),
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
@@ -599,7 +696,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ], isDark),
                   ],
-
                   // Pickup Store Address (Conditional)
                   if (_deliveryMethod == 'pickup')
                     _buildCard([
@@ -629,12 +725,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             FlutterMap(
                               mapController: _mapController,
                               options: MapOptions(
+                                crs: const CrsYandex(),
                                 initialCenter: _storeLocation,
                                 initialZoom: 15.0,
                               ),
                               children: [
                                 TileLayer(
-                                  urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                                  urlTemplate: 'https://core-renderer-tiles.maps.yandex.net/tiles?l=map&x={x}&y={y}&z={z}&lang=ru_RU',
                                 ),
                                 MarkerLayer(
                                   markers: [

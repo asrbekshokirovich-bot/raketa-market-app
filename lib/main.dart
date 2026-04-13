@@ -8,6 +8,7 @@ import 'providers/cart_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/localization_provider.dart';
 import 'providers/favorites_provider.dart';
+import 'providers/address_provider.dart';
 import 'screens/splash_screen.dart';
 import 'services/supabase_service.dart';
 
@@ -51,6 +52,14 @@ Future<void> main() async {
             final resultCart = cart ?? CartProvider();
             resultCart.updateUserId(auth.userProfile?['id']?.toString());
             return resultCart;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, AddressProvider>(
+          create: (_) => AddressProvider(),
+          update: (_, auth, address) {
+            final resultAddress = address ?? AddressProvider();
+            resultAddress.updateUserId(auth.userProfile?['id']?.toString());
+            return resultAddress;
           },
         ),
       ],

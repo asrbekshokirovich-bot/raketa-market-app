@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/localization_provider.dart';
-import '../utils/top_toast.dart';
+import '../providers/address_provider.dart';
+import 'add_edit_address_screen.dart';
 
 class AddressesScreen extends StatefulWidget {
   const AddressesScreen({super.key});
@@ -12,326 +13,235 @@ class AddressesScreen extends StatefulWidget {
 }
 
 class _AddressesScreenState extends State<AddressesScreen> {
-  final List<String> _regions = [
-    "Andijon viloyati",
-    "Buxoro viloyati",
-    "Farg'ona viloyati",
-    "Jizzax viloyati",
-    "Namangan viloyati",
-    "Navoiy viloyati",
-    "Qashqadaryo viloyati",
-    "Qoraqalpog'iston Respublikasi",
-    "Samarqand viloyati",
-    "Sirdaryo viloyati",
-    "Surxondaryo viloyati",
-    "Toshkent viloyati",
-    "Toshkent shahri",
-    "Xorazm viloyati",
-  ];
-
-  String? _selectedRegion;
-  
-  final _districtController = TextEditingController();
-  final _streetController = TextEditingController();
-  final _houseController = TextEditingController();
-
-  final List<String> _surxondaryoDistricts = [
-    "Angor tumani",
-    "Bandixon tumani",
-    "Boysun tumani",
-    "Denov tumani",
-    "Jarqo'rg'on tumani",
-    "Muzrabot tumani",
-    "Oltinsoy tumani",
-    "Qiziriq tumani",
-    "Qumqo'rg'on tumani",
-    "Sariosiyo tumani",
-    "Sherobod tumani",
-    "Sho'rchi tumani",
-    "Termiz tumani",
-    "Termiz shahri",
-    "Uzun tumani"
-  ];
-
-  void _showDistrictPicker(bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          padding: const EdgeInsets.only(top: 24),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: Column(
-            children: [
-              Container(width: 60, height: 6, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
-              const SizedBox(height: 24),
-              Text(context.read<LocalizationProvider>().translate('district_select_title'), style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-              const SizedBox(height: 16),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _surxondaryoDistricts.length,
-                  itemBuilder: (context, index) {
-                    final district = _surxondaryoDistricts[index];
-                    final isSelected = _districtController.text == district;
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                      title: Text(district, style: GoogleFonts.montserrat(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
-                      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: const Color(0xFFFF7A00)) : null,
-                      onTap: () {
-                        setState(() {
-                          _districtController.text = district;
-                        });
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-    );
-  }
-
-  void _showRegionPicker(bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          padding: const EdgeInsets.only(top: 24),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: Column(
-            children: [
-              Container(width: 60, height: 6, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
-              const SizedBox(height: 24),
-              Text(context.read<LocalizationProvider>().translate('region_select_title'), style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-              const SizedBox(height: 16),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _regions.length,
-                  itemBuilder: (context, index) {
-                    final region = _regions[index];
-                    final isSelected = _selectedRegion == region;
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                      title: Text(region, style: GoogleFonts.montserrat(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
-                      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: const Color(0xFFFF7A00)) : null,
-                      onTap: () {
-                        setState(() {
-                          _selectedRegion = region;
-                        });
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller, String label, String hint, IconData icon, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.03), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: TextField(
-        controller: controller,
-        style: GoogleFonts.montserrat(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w500),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: GoogleFonts.montserrat(color: Colors.grey[500], fontWeight: FontWeight.w500),
-          hintText: hint,
-          hintStyle: GoogleFonts.montserrat(color: Colors.grey[400]),
-          prefixIcon: Icon(icon, color: const Color(0xFFFF7A00)),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-          filled: true,
-          fillColor: Colors.transparent,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final addressProvider = context.watch<AddressProvider>();
+    final l10n = context.read<LocalizationProvider>();
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF9FAFB),
       appBar: AppBar(
-        title: Text(context.watch<LocalizationProvider>().translate('my_address'), style: GoogleFonts.montserrat(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(l10n.translate('my_address'), style: GoogleFonts.montserrat(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 18)),
         centerTitle: true,
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+      body: addressProvider.isLoading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF7A00)))
+          : addressProvider.addresses.isEmpty
+              ? _buildEmptyState(context, isDark, l10n)
+              : _buildAddressList(context, addressProvider, isDark, l10n),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const AddEditAddressScreen()));
+        },
+        backgroundColor: const Color(0xFFFF7A00),
+        icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white),
+        label: Text(l10n.translate('add_new_address'), style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, color: Colors.white)),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, bool isDark, LocalizationProvider l10n) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-             // Region Selector Card
-             Text(context.watch<LocalizationProvider>().translate('your_region'), style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey[500])),
-             const SizedBox(height: 8),
-             InkWell(
-               onTap: () => _showRegionPicker(isDark),
-               borderRadius: BorderRadius.circular(16),
-               child: Container(
-                 padding: const EdgeInsets.all(20),
-                 decoration: BoxDecoration(
-                   color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                   borderRadius: BorderRadius.circular(16),
-                   border: Border.all(color: const Color(0xFFFF7A00).withOpacity(0.3), width: 1.5),
-                 ),
-                 child: Row(
-                   children: [
-                     const Icon(Icons.map_rounded, color: Color(0xFFFF7A00)),
-                     const SizedBox(width: 16),
-                     Expanded(
-                       child: Text(
-                         _selectedRegion ?? context.watch<LocalizationProvider>().translate('select_region_hint'), 
-                         style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.w600, color: _selectedRegion == null ? Colors.grey : (isDark ? Colors.white : Colors.black87)),
-                       ),
-                     ),
-                     const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey),
-                   ],
-                 ),
-               ),
-             ),
-
-             const SizedBox(height: 32),
-
-             // Main Content logic based on selected region
-             if (_selectedRegion == null)
-               Center(
-                 child: Padding(
-                   padding: const EdgeInsets.only(top: 40),
-                   child: Column(
-                     children: [
-                       Icon(Icons.location_city_rounded, size: 80, color: Colors.grey[300]),
-                       const SizedBox(height: 16),
-                       Text(
-                         context.watch<LocalizationProvider>().translate('add_address_prompt'),
-                         textAlign: TextAlign.center,
-                         style: GoogleFonts.montserrat(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.grey[500]),
-                       ),
-                     ],
-                   ),
-                 ),
-               )
-             else if (_selectedRegion != "Surxondaryo viloyati")
-               Center(
-                 child: Container(
-                   padding: const EdgeInsets.all(24),
-                   decoration: BoxDecoration(
-                     color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                     borderRadius: BorderRadius.circular(24),
-                     border: isDark ? Border.all(color: Colors.redAccent.withOpacity(0.2)) : null,
-                     boxShadow: !isDark ? [BoxShadow(color: Colors.redAccent.withOpacity(0.1), blurRadius: 20)] : [],
-                   ),
-                   child: Column(
-                     children: [
-                       Container(
-                         padding: const EdgeInsets.all(20),
-                         decoration: BoxDecoration(
-                           color: Colors.redAccent.withOpacity(0.1),
-                           shape: BoxShape.circle,
-                         ),
-                         child: const Icon(Icons.location_off_rounded, size: 48, color: Colors.redAccent),
-                       ),
-                       const SizedBox(height: 24),
-                       Text(
-                         context.watch<LocalizationProvider>().translate('sorry'),
-                         style: GoogleFonts.montserrat(fontSize: 20, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
-                       ),
-                       const SizedBox(height: 12),
-                       Text(
-                         context.watch<LocalizationProvider>().translate('no_service'),
-                         textAlign: TextAlign.center,
-                         style: GoogleFonts.montserrat(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey[500], height: 1.5),
-                       ),
-                     ],
-                   ),
-                 ),
-               )
-             else ...[
-                // Surxondaryo Region Form
-                Text(context.watch<LocalizationProvider>().translate('address_details'), style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey[500])),
-                const SizedBox(height: 16),
-                GestureDetector(
-                  onTap: () => _showDistrictPicker(isDark),
-                  child: AbsorbPointer(
-                    child: _buildTextField(_districtController, context.watch<LocalizationProvider>().translate('district_label'), context.watch<LocalizationProvider>().translate('district_hint'), Icons.location_city_rounded, isDark),
-                  ),
-                ),
-                _buildTextField(_streetController, context.watch<LocalizationProvider>().translate('street_label'), context.watch<LocalizationProvider>().translate('street_hint'), Icons.signpost_rounded, isDark),
-                _buildTextField(_houseController, context.watch<LocalizationProvider>().translate('house_label'), context.watch<LocalizationProvider>().translate('house_hint'), Icons.home_rounded, isDark),
-                
-                const SizedBox(height: 16),
-                
-                // Map Picker Button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: Color(0xFFFF7A00), width: 2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: () {
-                      TopToast.show(context, context.read<LocalizationProvider>().translate('map_open_warning'), color: const Color(0xFFFF7A00), icon: Icons.map_rounded);
-                    },
-                    icon: const Icon(Icons.pin_drop_rounded, color: Color(0xFFFF7A00)),
-                    label: Text(context.watch<LocalizationProvider>().translate('pick_map'), style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, color: const Color(0xFFFF7A00), fontSize: 16)),
-                  ),
-                ),
-                
-                const SizedBox(height: 32),
-                
-                // Save Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF7A00),
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: () {
-                      if (_districtController.text.isEmpty || _streetController.text.isEmpty) {
-                         TopToast.show(context, context.read<LocalizationProvider>().translate('fill_all'), color: Colors.redAccent, icon: Icons.warning_rounded);
-                         return;
-                      }
-                      TopToast.show(context, context.read<LocalizationProvider>().translate('address_saved'), color: Colors.green, icon: Icons.check_circle_rounded);
-                      Navigator.pop(context);
-                    },
-                    child: Text(context.watch<LocalizationProvider>().translate('save_button'), style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
-                  ),
-                ),
-             ],
-          ]
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(color: const Color(0xFFFF7A00).withOpacity(0.1), shape: BoxShape.circle),
+              child: Icon(Icons.location_off_rounded, size: 80, color: const Color(0xFFFF7A00).withOpacity(0.5)),
+            ),
+            const SizedBox(height: 24),
+            Text(l10n.translate('no_addresses_yet'), textAlign: TextAlign.center, style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54)),
+          ],
         ),
       ),
     );
   }
+
+  Widget _buildAddressList(BuildContext context, AddressProvider provider, bool isDark, LocalizationProvider l10n) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: provider.addresses.length,
+      itemBuilder: (context, index) {
+        final address = provider.addresses[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: address.isDefault ? Border.all(color: const Color(0xFFFF7A00), width: 1.5) : null,
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => AddEditAddressScreen(address: address)));
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: const Color(0xFFFF7A00).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Icon(_getAddressIcon(address.name), color: const Color(0xFFFF7A00)),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(address.name, style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                              const SizedBox(width: 8),
+                              if (address.isDefault)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(color: const Color(0xFFFF7A00), borderRadius: BorderRadius.circular(6)),
+                                  child: Text(l10n.translate('default_label'), style: GoogleFonts.montserrat(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildAddressLine(l10n.translate('region_label'), address.region, isDark),
+                              _buildAddressLine(l10n.translate('district_label'), address.district, isDark),
+                              _buildAddressLine(l10n.translate('street_label'), address.street, isDark),
+                              if (address.house != null && address.house!.isNotEmpty)
+                                _buildAddressLine(l10n.translate('house_label'), address.house!, isDark),
+                              const SizedBox(height: 4),
+                              _buildAddressLine(
+                                l10n.translate('coordinates'),
+                                "${(address.lat ?? 0.0).toStringAsFixed(6)}, ${(address.lng ?? 0.0).toStringAsFixed(6)}",
+                                isDark,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded, color: Colors.grey),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      onSelected: (value) async {
+                        if (value == 'edit') {
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => AddEditAddressScreen(address: address)));
+                        } else if (value == 'delete') {
+                          final confirm = await _showDeleteConfirm(context, isDark, l10n);
+                          if (confirm == true) {
+                            await provider.deleteAddress(address.id);
+                          }
+                        } else if (value == 'default') {
+                          await provider.setDefaultAddress(address.id);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        if (!address.isDefault)
+                          PopupMenuItem(
+                            value: 'default',
+                            child: Row(
+                              children: [
+                                Icon(Icons.star_border_rounded, color: Theme.of(context).primaryColor, size: 20),
+                                const SizedBox(width: 10),
+                                Text(l10n.translate('set_as_default'), style: GoogleFonts.montserrat(fontSize: 13, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.edit_road_rounded, color: Colors.blue, size: 20),
+                              const SizedBox(width: 10),
+                              Text(l10n.translate('malumot'), style: GoogleFonts.montserrat(fontSize: 13, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                              const SizedBox(width: 10),
+                              Text(
+                                l10n.translate('del_acc_btn'),
+                                style: GoogleFonts.montserrat(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.redAccent),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAddressLine(String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: "$label: ",
+              style: GoogleFonts.montserrat(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+            ),
+            TextSpan(
+              text: value,
+              style: GoogleFonts.montserrat(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getAddressIcon(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('uy') || t.contains('дом') || t.contains('home')) return Icons.home_rounded;
+    if (t.contains('ish') || t.contains('rabota') || t.contains('work') || t.contains('ofis')) return Icons.work_rounded;
+    return Icons.location_on_rounded;
+  }
+
+  Future<bool?> _showDeleteConfirm(BuildContext context, bool isDark, LocalizationProvider l10n) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        title: Text(l10n.translate('del_acc_title'), style: GoogleFonts.montserrat(fontWeight: FontWeight.bold)),
+        content: Text(l10n.translate('delete_address_confirm'), style: GoogleFonts.montserrat()),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.translate('support_cancel'), style: GoogleFonts.montserrat(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.translate('del_acc_btn'), style: GoogleFonts.montserrat(color: Colors.redAccent, fontWeight: FontWeight.bold))),
+        ],
+      ),
+    );
+  }
 }
+
