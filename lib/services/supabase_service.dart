@@ -36,14 +36,162 @@ class SupabaseService {
           settings[item['name'].toString()] = item['value'].toString();
         }
       }
-      
-      print('=== Fetched App Settings ===');
-      print(settings);
-      
       return settings;
     } catch (e) {
-      print('Xatolik: app_settings jadvalini tortishda muammo - $e');
       return {};
+    }
+  }
+
+  // --- Promo Code Logic ---
+
+  /// Promo kodni bazadan tekshirish va chegirma miqdorini qaytarish
+  static Future<Map<String, dynamic>> validatePromoCode({
+    required String code,
+    required String phone,
+    required double subTotal,
+    required double deliveryFee,
+  }) async {
+    try {
+      // Diagnostic logging will show in terminal
+      // 1. Promo kodni qidirish
+      final promoResponse = await client
+          .from('promo_codes')
+          .select()
+          .eq('code', code.trim().toUpperCase())
+          .maybeSingle();
+      
+      print('Promo response for $code: $promoResponse');
+
+      if (promoResponse == null) {
+        return {'success': false, 'message_key': 'promo_not_found'};
+      }
+
+      final bool isActive = promoResponse['is_active'] ?? false;
+      if (!isActive) {
+        return {'success': false, 'message_key': 'promo_not_found'};
+      }
+
+      // Sanalarni tekshirish
+      final startDateStr = promoResponse['start_date'];
+      final endDateStr = promoResponse['end_date'];
+      final nowDt = DateTime.now().toUtc();
+
+      if (startDateStr != null) {
+        final start = DateTime.parse(startDateStr).toUtc();
+        if (nowDt.isBefore(start)) {
+          return {'success': false, 'message_key': 'promo_not_found'};
+        }
+      }
+
+      if (endDateStr != null) {
+        final end = DateTime.parse(endDateStr).toUtc();
+        if (nowDt.isAfter(end)) {
+          return {'success': false, 'message_key': 'promo_not_found'};
+        }
+      }
+
+      final promoId = promoResponse['id'];
+      final target = promoResponse['target']; // 'products' | 'delivery'
+      final type = promoResponse['type']; // 'percent' | 'amount'
+      final value = (promoResponse['value'] as num).toDouble();
+      final userLimit = promoResponse['user_limit'] as int;
+      final totalLimit = promoResponse['total_limit'] as int;
+      final usedCount = promoResponse['used_count'] as int;
+      final minAmount = (promoResponse['min_amount'] as num).toDouble();
+
+      // 2. Minimal buyurtma summasini tekshirish
+      if (subTotal < minAmount) {
+        return {
+          'success': false, 
+          'message_key': 'promo_min_amount_error',
+          'min_amount': minAmount,
+          'current_amount': subTotal
+        };
+      }
+
+      // 3. Umumiy limitni tekshirish
+      if (usedCount >= totalLimit) {
+        return {'success': false, 'message_key': 'promo_total_limit_reached'};
+      }
+
+      // 4. Shaxsiy (Foydalanuvchi) limitni tekshirish
+      final usageResponse = await client
+          .from('promo_usage')
+          .select('id')
+          .eq('promo_id', promoId)
+          .eq('phone', phone);
+      
+      if (usageResponse.length >= userLimit) {
+        return {'success': false, 'message_key': 'promo_user_limit_reached'};
+      }
+
+      // 5. Chegirmani hisoblash
+      double discount = 0;
+      double baseForDiscount = (target == 'delivery') ? deliveryFee : subTotal;
+
+      // Agar mahsulotlar uchun bo'lsa va chegirmasiz mahsulot yo'q bo'lsa
+      if (target == 'products' && subTotal <= 0) {
+        return {'success': false, 'message_key': 'promo_eligible_error'};
+      }
+
+      if (type == 'percent') {
+        discount = (baseForDiscount * value) / 100;
+      } else {
+        discount = value;
+      }
+
+      // Chegirma bazadan oshib ketmasligi kerak
+      if (discount > baseForDiscount) {
+        discount = baseForDiscount;
+      }
+
+      // Agar natija 0 bo'lsa (masalan, delivery targeted but delivery is already free)
+      if (discount <= 0) {
+        return {'success': false, 'message_key': 'promo_not_found'};
+      }
+
+      return {
+        'success': true,
+        'promo_id': promoId,
+        'discount': discount,
+        'target': target,
+        'type': type,
+        'value': value,
+      };
+    } catch (e) {
+      print('Promo validation error: $e');
+      return {'success': false, 'message_key': 'promo_system_error'};
+    }
+  }
+
+  /// Promo kod ishlatilganligini qayd etish
+  static Future<void> incrementPromoUsage(String promoId, String phone, String orderId) async {
+    try {
+      // 1. Promo koddagi used_count ni oshirish
+      await client.rpc('increment_promo_count', params: {'promo_id': promoId});
+      
+      // 2. Foydalanish tarixiga yozish
+      await client.from('promo_usage').insert({
+        'promo_id': promoId,
+        'phone': phone,
+        'order_id': orderId,
+      });
+    } catch (e) {
+      // Agar RPC xato bersa (yaratilmagan bo'lsa), oddiy update qilamiz
+      try {
+        final current = await client.from('promo_codes').select('used_count').eq('id', promoId).single();
+        await client.from('promo_codes').update({
+          'used_count': (current['used_count'] as int) + 1
+        }).eq('id', promoId);
+        
+        await client.from('promo_usage').insert({
+          'promo_id': promoId,
+          'phone': phone,
+          'order_id': orderId,
+        });
+      } catch (innerE) {
+        print('Error incrementing promo usage: $innerE');
+      }
     }
   }
 
@@ -62,6 +210,8 @@ class SupabaseService {
     required String address,
     required double totalAmount,
     required List<Map<String, dynamic>> items,
+    double deliveryFee = 0.0,
+    double discountAmount = 0.0,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -94,6 +244,8 @@ class SupabaseService {
         'address': address,
         'items_count': items.length,
         'total_amount': totalAmount,
+        'delivery_fee': deliveryFee,
+        'discount_amount': discountAmount,
         'status': 'Pending', // CRM qabul qilishi uchun Pending ga o'zgartirildi
         'courier_code': courierCodeGenerated,
       }).select().single();
@@ -283,7 +435,7 @@ class SupabaseService {
       final response = await client
           .from('announcements')
           .select()
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: true);
       
       final List<Map<String, dynamic>> result = [];
       for (var row in response) {
@@ -375,6 +527,64 @@ class SupabaseService {
           .eq('id', addressId);
     } catch (e) {
       print('Default manzilni sozlashda xatolik: $e');
+    }
+  }
+
+  // Faol hududlarni (viloyatlarni) olish
+  static Future<List<String>> getActiveRegions() async {
+    try {
+      final response = await client
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'active_regions')
+          .maybeSingle();
+      
+      if (response == null) {
+        print('active_regions topilmadi');
+        return [];
+      }
+
+      final String value = response['value']?.toString() ?? '';
+      if (value.isEmpty) return [];
+      
+      print('=== ACTIVE REGIONS RAW: $value ===');
+      
+      // JSON array formatida ["tashkent_city", "jizzakh"]
+      try {
+        final List<dynamic> decoded = json.decode(value);
+        final result = decoded.map((e) => e.toString()).toList();
+        print('=== ACTIVE REGIONS PARSED: $result ===');
+        return result;
+      } catch (e) {
+        // Agar oddiy string bo'lsa (comma separated)
+        return value.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+    } catch (e) {
+      print('Faol hududlarni yuklashda xatolik: $e');
+      return [];
+    }
+  }
+
+  /// Dastavka sozlamalarini olish
+  static Future<Map<String, dynamic>> getDeliveryConfig() async {
+    try {
+      final response = await client
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'delivery_config')
+          .maybeSingle();
+      
+      if (response == null) {
+        return {'mode': 'fixed', 'fixedPrice': 15000, 'tiers': []};
+      }
+
+      final String value = response['value']?.toString() ?? '';
+      if (value.isEmpty) return {'mode': 'fixed', 'fixedPrice': 15000, 'tiers': []};
+      
+      return json.decode(value) as Map<String, dynamic>;
+    } catch (e) {
+      print('Dastavka sozlamalarini yuklashda xatolik: $e');
+      return {'mode': 'fixed', 'fixedPrice': 15000, 'tiers': []};
     }
   }
 }

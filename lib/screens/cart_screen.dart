@@ -20,7 +20,7 @@ class CartScreen extends StatelessWidget {
     return formatter.format(amount).replaceAll(',', ' ');
   }
 
-  String _t(BuildContext context, String key, [String fallback = '']) {
+  String _t(BuildContext context, String key) {
     return context.read<LocalizationProvider>().translate(key);
   }
 
@@ -109,7 +109,7 @@ class CartScreen extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final cartItem = cart.items.values.toList()[index];
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
+                      margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                         borderRadius: BorderRadius.circular(16),
@@ -146,7 +146,7 @@ class CartScreen extends StatelessWidget {
                             );
                           },
                           child: Padding(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(12),
                             child: Column(
                               children: [
                                 // Header Actions Row
@@ -195,14 +195,14 @@ class CartScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            const Divider(height: 16),
+                            const Divider(height: 8),
                             // Product Info Row
                             Row(
                               children: [
                                 // Product Image
                                 Container(
-                                  width: 80,
-                                  height: 80,
+                                  width: 70,
+                                  height: 70,
                                   decoration: BoxDecoration(
                                     color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF3F4F6),
                                     borderRadius: BorderRadius.circular(16),
@@ -227,13 +227,13 @@ class CartScreen extends StatelessWidget {
                                                     ? (cartItem.imagePath.startsWith('assets/') ? cartItem.imagePath : 'assets/${cartItem.imagePath}')
                                                     : 'assets/images/placeholder.png',
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) => const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
+                                                errorBuilder: (_, _, _) => const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
                                               ),
                                       ],
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 16),
+                                const SizedBox(width: 12),
                                 // Details
                                 Expanded(
                                   child: Column(
@@ -249,7 +249,7 @@ class CartScreen extends StatelessWidget {
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 2),
                                       Text(
                                         _t(context, cartItem.subtitle.toLowerCase()), // Using lowercase mapped key translations if present
                                         style: GoogleFonts.montserrat(
@@ -260,7 +260,7 @@ class CartScreen extends StatelessWidget {
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      const SizedBox(height: 8),
+                                      const SizedBox(height: 4),
                                       Text(
                                         '${context.watch<LocalizationProvider>().translate('narxi')}:',
                                         style: GoogleFonts.montserrat(
@@ -289,7 +289,7 @@ class CartScreen extends StatelessWidget {
                                           color: const Color(0xFFFF7A00),
                                         ),
                                       ),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: 4),
                                       // Subtotal for this item
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -335,8 +335,8 @@ class CartScreen extends StatelessWidget {
                                           );
                                         },
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                          child: const Icon(Icons.add, size: 18, color: Color(0xFFFF7A00)),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          child: const Icon(Icons.add, size: 16, color: Color(0xFFFF7A00)),
                                         ),
                                       ),
                                       Padding(
@@ -368,8 +368,8 @@ class CartScreen extends StatelessWidget {
                                           context.read<CartProvider>().removeSingleItem(cartItem.id);
                                         },
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                          child: Icon(Icons.remove, size: 18, color: isDark ? Colors.grey[400] : Colors.grey[700]),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          child: Icon(Icons.remove, size: 16, color: isDark ? Colors.grey[400] : Colors.grey[700]),
                                         ),
                                       ),
                                     ],
@@ -388,7 +388,7 @@ class CartScreen extends StatelessWidget {
               ),
               // Bottom Checkout Panel
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -409,7 +409,7 @@ class CartScreen extends StatelessWidget {
                           Text(
                             context.watch<LocalizationProvider>().translate('jami_summa'),
                             style: GoogleFonts.montserrat(
-                              fontSize: 16,
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: isDark ? Colors.grey[400] : Colors.grey[600],
                             ),
@@ -417,7 +417,7 @@ class CartScreen extends StatelessWidget {
                           Text(
                             '${_fC(cart.totalAmount)} ${_t(context, 'som')}',
                             style: GoogleFonts.montserrat(
-                              fontSize: 22,
+                              fontSize: 19,
                               fontWeight: FontWeight.w800,
                               color: isDark ? Colors.white : Colors.black87,
                               letterSpacing: -0.5,
@@ -425,10 +425,10 @@ class CartScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
-                        height: 56,
+                        height: 48,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFFF7A00),

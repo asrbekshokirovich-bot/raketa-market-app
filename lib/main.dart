@@ -109,7 +109,6 @@ class SupermarketApp extends StatelessWidget {
               foregroundColor: Colors.white,
               elevation: 0,
             ),
-            useMaterial3: true,
           ),
           home: const SplashScreen(),
         );

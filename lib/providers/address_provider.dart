@@ -57,7 +57,7 @@ class AddressItem {
   }
 
   String get fullAddress {
-    return "$region, $district, $street" + (house != null && house!.isNotEmpty ? ", $house" : "");
+    return "$region, $district, $street${house != null && house!.isNotEmpty ? ", $house" : ""}";
   }
 
   String get multiLineAddress {

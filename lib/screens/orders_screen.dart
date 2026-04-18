@@ -8,8 +8,16 @@ import '../providers/localization_provider.dart';
 import '../utils/top_toast.dart';
 import 'dart:math' as math;
 
-// --- HELPER FUNCTION ---
-String _fC(num amount) => NumberFormat('#,###').format(amount).replaceAll(',', ' ');
+String _fC(dynamic amount) {
+  if (amount == null) return "0";
+  double val = 0;
+  if (amount is String) {
+    val = double.tryParse(amount.replaceAll(' ', '')) ?? 0.0;
+  } else if (amount is num) {
+    val = amount.toDouble();
+  }
+  return NumberFormat('#,###').format(val).replaceAll(',', ' ');
+}
 
 // --- MOCK MODELS ---
 class OrderItem {
@@ -34,12 +42,16 @@ class OrderModel {
   final String paymentMethod;
   final List<OrderItem> items;
   final String courierCode;
+  final double deliveryFee;
+  final double discountAmount;
 
   OrderModel({
     required this.id, required this.rawId, required this.date, required this.status, required this.currentStep,
     required this.totalAmount, required this.customerName, required this.phone, 
     required this.address, required this.paymentMethod, required this.items,
     required this.courierCode,
+    this.deliveryFee = 0.0,
+    this.discountAmount = 0.0,
   });
 }
 
@@ -94,36 +106,39 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     if (mounted) {
       setState(() {
         _orders = rawOrders.map((raw) {
-          final List itemsRaw = raw['order_items'] as List? ?? [];
+          final itemsRaw = (raw['order_items'] as List?) ?? [];
           
-          final String rawOrderString = raw['order_number'] ?? "#ID-${raw['id'].toString().substring(0, 5).toUpperCase()}";
+          final String rawOrderString = (raw['order_number'] ?? "#ID-${raw['id'].toString().substring(0, 5).toUpperCase()}").toString();
           final String rawOrderNumber = rawOrderString.replaceAll('#RM-', '#ID-');
           
           return OrderModel(
             id: rawOrderNumber,
-            rawId: raw['id'].toString(),
-            date: DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(raw['created_at'])),
-            status: raw['status'] == 'Pending' ? 'Yangi'
+            rawId: (raw['id'] ?? '').toString(),
+            date: DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(raw['created_at'] ?? DateTime.now().toIso8601String())),
+            status: (raw['status'] == 'Pending' ? 'Yangi'
                 : raw['status'] == 'Accepted' ? 'Qabul qilingan'
                 : raw['status'] == 'Picking' ? 'Tayyorlanmoqda'
                 : raw['status'] == 'Packed' ? 'Tayyor'
-                : raw['status'] ?? 'Yangi',
-            currentStep: _mapStatusToStep(raw['status']),
-            totalAmount: double.tryParse(raw['total_amount'].toString()) ?? 0.0,
-            customerName: raw['full_name'] ?? '',
-            phone: raw['customer_phone'] ?? '',
-            address: raw['address'] ?? '',
-            paymentMethod: raw['payment_method'] ?? 'Naqd pul',
-            courierCode: raw['courier_code'] ?? 'Kutilyapti',
+                : raw['status'] ?? 'Yangi').toString(),
+            currentStep: _mapStatusToStep(raw['status']?.toString()),
+            totalAmount: double.tryParse((raw['total_amount'] ?? '0').toString()) ?? 0.0,
+            customerName: (raw['full_name'] ?? '').toString(),
+            phone: (raw['customer_phone'] ?? '').toString(),
+            address: (raw['address'] ?? '').toString(),
+            paymentMethod: (raw['payment_method'] ?? 'Naqd pul').toString(),
+            courierCode: (raw['courier_code'] ?? 'Kutilyapti').toString(),
+            deliveryFee: double.tryParse((raw['delivery_fee'] ?? '0').toString()) ?? 0.0,
+            discountAmount: double.tryParse((raw['discount_amount'] ?? '0').toString()) ?? 0.0,
             items: itemsRaw.map((i) {
-              final product = i['product_listings'] ?? i['products'] ?? {};
+              final itemMap = (i as Map?) ?? {};
+              final product = (itemMap['product_listings'] ?? itemMap['products'] ?? {}) as Map;
               return OrderItem(
-                name: product['name'] ?? 'Mahsulot',
+                name: (product['name'] ?? 'Mahsulot').toString(),
                 imageUrl: (product['images'] != null && (product['images'] as List).isNotEmpty)
-                    ? (product['images'] as List)[0]
-                    : (product['image_url'] ?? ''),
-                qty: i['quantity'] ?? 1,
-                price: double.tryParse(i['price_at_time'].toString()) ?? 0.0,
+                    ? (product['images'] as List)[0].toString()
+                    : (product['image_url'] ?? '').toString(),
+                qty: int.tryParse((itemMap['quantity'] ?? '1').toString()) ?? 1,
+                price: double.tryParse((itemMap['price_at_time'] ?? '0').toString()) ?? 0.0,
                 isDiscounted: (product['discount_percent'] != null && product['discount_percent'].toString() != '0'),
               );
             }).toList(),
@@ -232,8 +247,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         itemBuilder: (context, index) {
         final order = orders[index];
         String trKey = 'jarayonda';
-        if (order.status == 'Yangi') trKey = 'qabul_kutilmoqda';
-        else if (order.status == 'Qabul qilingan') trKey = 'qabul_qilingan';
+        if (order.status == 'Yangi') {
+          trKey = 'qabul_kutilmoqda';
+        } else if (order.status == 'Qabul qilingan') trKey = 'qabul_qilingan';
         else if (order.status == 'Tayyorlanmoqda') trKey = 'tayyorlanmoqda';
         else if (order.status == 'Tayyor' || order.status == 'Yetkazib berilgan') trKey = 'yetkazilgan';
 
@@ -370,11 +386,6 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     return tr == key && fallback.isNotEmpty ? fallback : tr;
   }
 
-  String _fC(dynamic amount) {
-    if (amount == null) return "0";
-    double val = amount is String ? double.tryParse(amount) ?? 0 : (amount as num).toDouble();
-    return val.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]} ');
-  }
 
   Widget _buildInfoRow(String title, String value, bool isDark, {Color? valueColor, double valueSize = 13}) {
     return Row(
@@ -457,12 +468,14 @@ class OrderDetailsScreen extends StatelessWidget {
         } else if (index == 1) {
           stepText = isCompleted ? "Tayyor" : (isCurrent ? "Tayyorlanmoqda" : "Tayyor");
         } else if (index == 2) {
-          if (currentStep < 2) stepText = "Yo'lda";
-          else if (currentStep == 2) stepText = "Kuryer kutilmoqda";
+          if (currentStep < 2) {
+            stepText = "Yo'lda";
+          } else if (currentStep == 2) stepText = "Kuryer kutilmoqda";
           else stepText = "Kuryerga berildi";
         } else if (index == 3) {
-          if (currentStep < 3) stepText = "Yetkazildi";
-          else if (currentStep == 3) stepText = "Yo'lda";
+          if (currentStep < 3) {
+            stepText = "Yetkazildi";
+          } else if (currentStep == 3) stepText = "Yo'lda";
           else stepText = "Yetkazildi";
         }
 
@@ -565,8 +578,9 @@ class OrderDetailsScreen extends StatelessWidget {
             final rawData = snapshot.data!.first;
             final rawStatus = rawData['status'] as String?;
             final s = (rawStatus ?? "").toLowerCase();
-            if (s.contains('yangi') || s == 'pending') step = 0;
-            else if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') step = 1;
+            if (s.contains('yangi') || s == 'pending') {
+              step = 0;
+            } else if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') step = 1;
             else if (s == 'packed' || s == 'waiting' || s.contains('tayyor')) step = 2;
             else if (s.contains('yo\'lda') || s == 'ontheway' || s == 'delivering') step = 3;
             else if (s.contains('yetkazildi') || s == 'delivered') step = 4;
@@ -745,9 +759,24 @@ class OrderDetailsScreen extends StatelessWidget {
                     builder: (ctx) {
                       double itemsSum = 0;
                       for (var i in order.items) { itemsSum += i.price * i.qty; }
-                      double difference = order.totalAmount - itemsSum;
-                      double deliveryFee = difference > 0 ? difference : 0;
-                      double promoDiscount = difference < 0 ? difference.abs() : 0;
+                      
+                      double dispDelivery = order.deliveryFee;
+                      double dispPromo = order.discountAmount;
+
+                      // Fallback for older orders where breakdown wasn't saved
+                      if (dispDelivery == 0 && dispPromo == 0) {
+                        double diff = order.totalAmount - itemsSum;
+                        if (diff > 0) {
+                          if (diff < 15000) { // Likely 15000 - promo
+                            dispDelivery = 15000;
+                            dispPromo = 15000 - diff;
+                          } else {
+                            dispDelivery = diff;
+                          }
+                        } else if (diff < 0) {
+                          dispPromo = diff.abs();
+                        }
+                      }
                       
                       return Column(
                         children: [
@@ -767,21 +796,21 @@ class OrderDetailsScreen extends StatelessWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(_t(context, 'yetkazib_berish_title', "Yetkazib berish:"), style: GoogleFonts.montserrat(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
-                                    Text(deliveryFee > 0 ? "${_fC(deliveryFee)} ${_t(context, 'som', "so'm")}" : "${_t(context, 'bepul', 'Bepul')} (0 ${_t(context, 'som', "so'm")})", style: GoogleFonts.montserrat(color: deliveryFee > 0 ? (isDark ? Colors.white : Colors.black87) : Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(_t(context, 'promo_kod_chegirma', "Promo kod (Chegirma):"), style: GoogleFonts.montserrat(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
-                                    Text(promoDiscount > 0 ? "- ${_fC(promoDiscount)} ${_t(context, 'som', "so'm")}" : _t(context, 'yoq', "Yo'q"), style: GoogleFonts.montserrat(color: promoDiscount > 0 ? Colors.green : Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(_t(context, 'yetkazib_berish_title', "Yetkazib berish:"), style: GoogleFonts.montserrat(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
+                                      Text(dispDelivery > 0 ? "${_fC(dispDelivery)} ${_t(context, 'som', "so'm")}" : "${_t(context, 'bepul', 'Bepul')} (0 ${_t(context, 'som', "so'm")})", style: GoogleFonts.montserrat(color: dispDelivery > 0 ? (isDark ? Colors.white : Colors.black87) : Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(_t(context, 'promo_kod_chegirma', "Promo kod (Chegirma):"), style: GoogleFonts.montserrat(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
+                                      Text(dispPromo > 0 ? "- ${_fC(dispPromo)} ${_t(context, 'som', "so'm")}" : _t(context, 'yoq', "Yo'q"), style: GoogleFonts.montserrat(color: dispPromo > 0 ? Colors.green : Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
                                 const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

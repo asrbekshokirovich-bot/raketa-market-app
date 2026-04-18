@@ -271,7 +271,7 @@ class DoodlePainter extends CustomPainter {
 class _TelegramVideoPlayerPlaceholder extends StatefulWidget {
   final double sizeMb;
   final String duration;
-  const _TelegramVideoPlayerPlaceholder({Key? key, required this.sizeMb, required this.duration}) : super(key: key);
+  const _TelegramVideoPlayerPlaceholder({super.key, required this.sizeMb, required this.duration});
 
   @override
   State<_TelegramVideoPlayerPlaceholder> createState() => _TelegramVideoPlayerPlaceholderState();

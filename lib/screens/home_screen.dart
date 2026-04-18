@@ -810,7 +810,7 @@ class _AutoScrollingBannersState extends State<_AutoScrollingBanners> {
 
 class _AutoScrollingCategories extends StatefulWidget {
   final List<String> categories;
-  const _AutoScrollingCategories({super.key, required this.categories});
+  const _AutoScrollingCategories({required this.categories});
 
   @override
   State<_AutoScrollingCategories> createState() => _AutoScrollingCategoriesState();

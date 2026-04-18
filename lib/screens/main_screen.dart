@@ -38,6 +38,9 @@ class _MainScreenState extends State<MainScreen> {
     // Asynchronous state update to prevent build phase collisions
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        // Savatni har doim (mijozga sezdirmay) fonda yangilash
+        context.read<CartProvider>().loadFromDatabase();
+        
         setState(() {
           _currentIndex = index;
           _scrollToProductsOnHome = scrollToProducts;
@@ -176,11 +179,7 @@ class _MainScreenState extends State<MainScreen> {
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: () => _handleNavigate(index),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

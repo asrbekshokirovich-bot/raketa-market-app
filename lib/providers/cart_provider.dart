@@ -36,6 +36,61 @@ class CartProvider with ChangeNotifier {
   Map<String, CartItem> get items => _items;
   String? get userId => _userId;
 
+  Map<String, dynamic>? _deliveryConfig;
+  Map<String, dynamic>? get deliveryConfig => _deliveryConfig;
+
+  double calculateDeliveryFee(double subtotal) {
+    if (_deliveryConfig == null) return 15000.0; // Default fallback
+
+    final mode = _deliveryConfig!['mode'] ?? 'fixed';
+    
+    if (mode == 'fixed') {
+      return (_deliveryConfig!['fixedPrice'] as num?)?.toDouble() ?? 15000.0;
+    } else if (mode == 'tiered') {
+      final tiers = _deliveryConfig!['tiers'] as List<dynamic>? ?? [];
+      for (var tier in tiers) {
+        final Map<String, dynamic> t = tier as Map<String, dynamic>;
+        final min = (t['min'] as num?)?.toDouble() ?? 0.0;
+        final max = (t['max'] as num?)?.toDouble() ?? double.infinity;
+        final price = (t['price'] as num?)?.toDouble() ?? 0.0;
+        
+        if (subtotal >= min && subtotal <= max) {
+          return price;
+        }
+      }
+    }
+    
+    return 15000.0;
+  }
+
+  /// Keyingi dastavka pog'onasi haqida ma'lumot olish
+  Map<String, dynamic>? getNextTierInfo(double subtotal) {
+    if (_deliveryConfig == null || _deliveryConfig!['mode'] != 'tiered') return null;
+
+    final tiers = _deliveryConfig!['tiers'] as List<dynamic>? ?? [];
+    if (tiers.isEmpty) return null;
+
+    // Pog'onalarni min bo'yicha saralaymiz
+    final sortedTiers = List<dynamic>.from(tiers);
+    sortedTiers.sort((a, b) => ((a['min'] as num?)?.toDouble() ?? 0.0)
+        .compareTo((b['min'] as num?)?.toDouble() ?? 0.0));
+
+    for (var tier in sortedTiers) {
+      final Map<String, dynamic> t = tier as Map<String, dynamic>;
+      final min = (t['min'] as num?)?.toDouble() ?? 0.0;
+      
+      if (min > subtotal) {
+        return {
+          'needed': min - subtotal,
+          'next_price': (t['price'] as num?)?.toDouble() ?? 0.0,
+          'is_free': ((t['price'] as num?)?.toDouble() ?? 0.0) == 0,
+        };
+      }
+    }
+
+    return null; // Keyingi pog'ona yo'q (eng yuqori pog'onada)
+  }
+
   int get itemCount {
     return _items.length;
   }
@@ -88,21 +143,42 @@ class CartProvider with ChangeNotifier {
           // Agar bizda bu mahsulot allaqachon bo'lsa, uning tanlanganlik holatini saqlaymiz
           final bool wasSelected = _items.containsKey(pId) ? _items[pId]!.isSelected : true;
           
+          // Narxlarni formatlash uchun yordamchi
+          String formatPrice(int p) {
+            return '${p.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]} ')} so\'m';
+          }
+          
+          final String rawPrice = product['price']?.toString() ?? '0';
+          final String rawOldPrice = product['original_price']?.toString() ?? '0';
+          
+          int priceVal = int.tryParse(rawPrice.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+          int oldPriceVal = int.tryParse(rawOldPrice.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
           newItems[pId] = CartItem(
             id: pId,
             title: product['name'] ?? '',
             subtitle: product['category'] ?? '',
-            price: "${product['price']} so'm",
+            price: formatPrice(priceVal),
+            oldPrice: oldPriceVal > priceVal && priceVal > 0 ? formatPrice(oldPriceVal) : null,
             imagePath: product['image_url'] ?? 'assets/images/placeholder.png',
             unit: product['unit'] ?? 'ta',
             quantity: item['quantity'] ?? 1,
             isSelected: wasSelected,
+            discountBadge: (product['discount_percent'] != null && product['discount_percent'].toString() != '0')
+                ? '${product['discount_percent']}% CHEGIRMA'
+                : (oldPriceVal > priceVal && priceVal > 0)
+                    ? '${((oldPriceVal - priceVal) / oldPriceVal * 100).round()}% CHEGIRMA'
+                    : null,
           );
         }
       }
       
       _items.clear();
       _items.addAll(newItems);
+      
+      // Fetch delivery config to stay synced with CRM
+      _deliveryConfig = await SupabaseService.getDeliveryConfig();
+      
       notifyListeners();
     } catch (e) {
       debugPrint('❌ CartProvider.loadFromDatabase ERROR: $e');
@@ -236,6 +312,15 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
     if (_userId != null) {
       await SupabaseService.clearCart(_userId!);
+    }
+  }
+
+  Future<void> fetchDeliveryConfig() async {
+    try {
+      _deliveryConfig = await SupabaseService.getDeliveryConfig();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ CartProvider.fetchDeliveryConfig ERROR: $e');
     }
   }
 

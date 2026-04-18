@@ -156,8 +156,9 @@ class AuthProvider with ChangeNotifier {
         if (status == null) continue;
         final s = status.toLowerCase();
         int step = 0;
-        if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') step = 1;
-        else if (s == 'packed' || s.contains('tayyor')) step = 2;
+        if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') {
+          step = 1;
+        } else if (s == 'packed' || s.contains('tayyor')) step = 2;
         else if (s.contains('yo\'lda') || s == 'delivering') step = 3;
         else if (s.contains('yetkazildi') || s == 'delivered') step = 4;
         

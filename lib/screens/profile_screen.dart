@@ -6,6 +6,7 @@ import 'profile_edit_screen.dart';
 import 'orders_screen.dart';
 import 'addresses_screen.dart';
 import 'favorites_screen.dart';
+// import 'stores_screen.dart';
 import 'support_screen.dart';
 import 'about_screen.dart';
 import 'splash_screen.dart';
@@ -160,7 +161,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                        (currentCode == 'en' && lang == 'English');
     return ListTile(
       title: Text(lang, style: GoogleFonts.montserrat(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black)),
-      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: const Color(0xFFFF7A00)) : null,
+      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: Color(0xFFFF7A00)) : null,
       onTap: () {
         context.read<LocalizationProvider>().changeLanguage(
           lang == "O'zbekcha" ? 'uz' : (lang == 'Русский' ? 'ru' : 'en')
@@ -496,7 +497,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onChanged: (val) {
                     themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
                   },
-                  activeColor: const Color(0xFFFF7A00),
+                  activeThumbColor: const Color(0xFFFF7A00),
                 ),
               ),
             ],

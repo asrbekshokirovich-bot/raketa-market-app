@@ -1,11 +1,14 @@
 import 'dart:math' as math;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'dart:ui' show Rect, Offset;
 
 class YandexProjection extends Projection {
   static const double _eccentricity = 0.0818191908426;
 
-  const YandexProjection() : super();
+  const YandexProjection() : super(
+    const Rect.fromLTRB(-3.141592653589793, -3.141592653589793, 3.141592653589793, 3.141592653589793)
+  );
 
   @override
   (double, double) projectXY(LatLng latLng) {
@@ -23,25 +26,75 @@ class YandexProjection extends Projection {
 
   @override
   LatLng unprojectXY(double x, double y) {
-    // Note: unproject is complex for Elliptical Mercator, 
-    // but usually only projectXY is needed for rendering tiles/markers.
-    // This is a simplified fallback.
-    return const LatLng(0, 0); 
+    final lng = x * (180 / math.pi);
+    
+    // Inverse Elliptical Mercator Latitude (iterative)
+    final double ts = math.exp(-y);
+    double phi = math.pi / 2 - 2 * math.atan(ts);
+    double dphi;
+    int i = 0;
+    
+    do {
+      final con = _eccentricity * math.sin(phi);
+      final conPow = math.pow((1.0 - con) / (1.0 + con), _eccentricity / 2.0);
+      final newPhi = math.pi / 2 - 2 * math.atan(ts * conPow);
+      dphi = (newPhi - phi).abs();
+      phi = newPhi;
+      i++;
+    } while (dphi > 1e-10 && i < 15);
+
+    final lat = phi * (180 / math.pi);
+    return LatLng(lat, lng);
   }
-  
-  @override
-  (double, double) get bounds => (math.pi, math.pi);
 }
 
 class CrsYandex extends Crs {
   const CrsYandex()
       : super(
-          projection: const YandexProjection(),
-          transformation: const Transformation(0.5 / math.pi, 0.5, -0.5 / math.pi, 0.5),
+          code: 'EPSG:3395',
+          infinite: false,
         );
 
   @override
-  String get code => 'EPSG:3395';
+  Projection get projection => const YandexProjection();
+
+  @override
+  (double, double) latLngToXY(LatLng latlng, double scale) {
+    final (x, y) = projection.projectXY(latlng);
+    return transform(x, y, scale);
+  }
+
+  @override
+  (double, double) transform(double x, double y, double scale) {
+    return (
+      scale * (0.5 / math.pi * x + 0.5),
+      scale * (-0.5 / math.pi * y + 0.5),
+    );
+  }
+
+  @override
+  (double, double) untransform(double x, double y, double scale) {
+    return (
+      (x / scale - 0.5) * (2 * math.pi),
+      (y / scale - 0.5) * (-2 * math.pi),
+    );
+  }
+
+  @override
+  LatLng offsetToLatLng(Offset offset, double zoom) {
+    final s = scale(zoom);
+    final (ux, uy) = untransform(offset.dx, offset.dy, s);
+    return projection.unprojectXY(ux, uy);
+  }
+
+  @override
+  Rect? getProjectedBounds(double zoom) {
+    final b = projection.bounds!;
+    final s = scale(zoom);
+    final (minx, miny) = transform(b.left, b.top, s);
+    final (maxx, maxy) = transform(b.right, b.bottom, s);
+    return Rect.fromPoints(Offset(minx, miny), Offset(maxx, maxy));
+  }
 }
 
 class MapConstants {

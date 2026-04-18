@@ -1,4 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'lib/services/supabase_service.dart';
 
 void main() async {
