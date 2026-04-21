@@ -120,6 +120,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                     itemBuilder: (context, dynamic item) => _buildMessageBubble(item, isDark),
                     useStickyGroupSeparators: true,
                     floatingHeader: true,
+                    reverse: true,
                     sort: false,
                     padding: const EdgeInsets.all(12.0),
                   ),

@@ -586,11 +586,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required VoidCallback onTap,
     required bool isDark,
     String? badge,
+    bool isEnabled = true,
   }) {
     return InkWell(
-      onTap: onTap,
+      onTap: isEnabled ? onTap : null,
       borderRadius: BorderRadius.circular(12),
-      child: Container(
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: isEnabled ? 1.0 : 0.5,
+        child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFFF7A00).withOpacity(0.08) : Colors.transparent,
@@ -599,7 +603,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             color: isSelected ? const Color(0xFFFF7A00) : (isDark ? Colors.grey[800]! : Colors.grey[300]!),
             width: isSelected ? 2 : 1,
           ),
-          boxShadow: isSelected ? [
+          boxShadow: (isSelected && isEnabled) ? [
             BoxShadow(
               color: const Color(0xFFFF7A00).withOpacity(0.25),
               blurRadius: 16,
@@ -675,8 +679,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildDashedDivider(bool isDark) {
     return LayoutBuilder(
@@ -761,7 +766,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final l10n = context.read<LocalizationProvider>();
+    final l10n = context.watch<LocalizationProvider>();
     final cart = context.watch<CartProvider>();
     final deliveryFee = _deliveryMethod == 'delivery' ? cart.calculateDeliveryFee(cart.totalAmount) : 0.0;
     // Hisob-kitob uchun maxsulotlarni ajratish
@@ -828,6 +833,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       isSelected: _deliveryMethod == 'pickup',
                       onTap: () => setState(() => _deliveryMethod = 'pickup'),
                       isDark: isDark,
+                      isEnabled: false,
                     ),
                   ], isDark),
 
@@ -1571,8 +1577,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 Expanded(
                                   child: Text(
                                     _promoType == 'percent' 
-                                      ? "Sizga ${_promoValue?.toInt()}% chegirma berildi"
-                                      : "Sizga ${_fC(_promoValue ?? 0)} ${l10n.translate('som')} chegirma berildi",
+                                      ? l10n.translate('chegirma_berildi').replaceAll('%s', "${_promoValue?.toInt()}%")
+                                      : l10n.translate('chegirma_berildi').replaceAll('%s', "${_fC(_promoValue ?? 0)} ${l10n.translate('som')}"),
                                     style: GoogleFonts.montserrat(
                                       color: Colors.green[700],
                                       fontWeight: FontWeight.w600,
@@ -1707,8 +1713,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 Expanded(
                                   child: Text(
                                     nextTier['is_free'] 
-                                      ? "Yana ${_fC(nextTier['needed'])} ${l10n.translate('som')} xarid qiling va bepul dastavkaga ega bo'ling!"
-                                      : "Yana ${_fC(nextTier['needed'])} ${l10n.translate('som')} xarid qiling va dastavka narxini ${_fC(nextTier['next_price'])} ${l10n.translate('som')}ga tushiring!",
+                                      ? l10n.translate('delivery_promo_free')
+                                          .replaceFirst('%s', _fC(nextTier['needed']))
+                                          .replaceFirst('%s', l10n.translate('som'))
+                                      : l10n.translate('delivery_promo_tier')
+                                          .replaceFirst('%s', _fC(nextTier['needed']))
+                                          .replaceFirst('%s', l10n.translate('som'))
+                                          .replaceFirst('%s', _fC(nextTier['next_price']))
+                                          .replaceFirst('%s', l10n.translate('som')),
                                     style: GoogleFonts.montserrat(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -1905,10 +1917,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             phone: _phoneController.text,
                             address: _deliveryMethod == 'delivery' ? ("$_geocodedAddress\n${_addressController.text}") : l10n.translate('pickup_at_main_store'),
                             totalAmount: total,
+                            coordinates: _coordinateString,
                             deliveryFee: deliveryFee,
                             discountAmount: _discountAmount,
+                            promoCode: _isPromoApplied ? _promoController.text.trim() : null,
+                            promoType: _isPromoApplied ? _promoType : null,
+                            promoValue: _isPromoApplied ? _promoValue : null,
                             items: cart.items.values.where((item) => item.isSelected).map((item) => {
-                              'product_id': item.id, // Bu yerda biz ID-ni Home/Category screenlarda mapp qilganmiz
+                              'product_id': item.id,
+                              'product_name': item.title,
+                              'sku': item.sku,
                               'quantity': item.quantity,
                               'price': double.tryParse(item.price.replaceAll(' so\'m', '').replaceAll(' ', '')) ?? 0.0,
                             }).toList(),

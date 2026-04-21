@@ -210,8 +210,12 @@ class SupabaseService {
     required String address,
     required double totalAmount,
     required List<Map<String, dynamic>> items,
+    String coordinates = '',
     double deliveryFee = 0.0,
     double discountAmount = 0.0,
+    String? promoCode,
+    String? promoType,
+    double? promoValue,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -242,10 +246,14 @@ class SupabaseService {
         'customer_name': name,
         'customer_phone': phone,
         'address': address,
+        'coordinates': coordinates,
         'items_count': items.length,
         'total_amount': totalAmount,
         'delivery_fee': deliveryFee,
         'discount_amount': discountAmount,
+        'promo_code': promoCode,
+        'promo_type': promoType,
+        'promo_value': promoValue,
         'status': 'Pending', // CRM qabul qilishi uchun Pending ga o'zgartirildi
         'courier_code': courierCodeGenerated,
       }).select().single();
@@ -253,10 +261,36 @@ class SupabaseService {
       final orderId = orderResponse['id'];
 
       // 2. Order Items jadvaliga kiritish
+      // CRM products jadvalidan qidirgani uchun, SKU orqali haqiqiy product ID-larni aniqlaymiz
+      final skus = items.map((i) => i['sku']?.toString()).where((s) => s != null && s.isNotEmpty).toList();
+      Map<String, String> skuToRealId = {};
+      
+      if (skus.isNotEmpty) {
+        try {
+          final productsResponse = await client
+              .from('products')
+              .select('id, sku')
+              .filter('sku', 'in', skus);
+          
+          for (var p in (productsResponse as List)) {
+            if (p['sku'] != null && p['id'] != null) {
+              skuToRealId[p['sku'].toString()] = p['id'].toString();
+            }
+          }
+        } catch (skuError) {
+          print('SKU lookup error: $skuError');
+          // Lookup xato bersa ham davom etamiz (listing ID-ni ishlatamiz)
+        }
+      }
+
       final List<Map<String, dynamic>> itemsToInsert = items.map((item) {
+        String? resolvedId = skuToRealId[item['sku']?.toString()];
         return {
           'order_id': orderId,
-          'product_id': item['product_id'],
+          'product_id': resolvedId ?? item['product_id'], // CRM uchun products.id (topilmasa listing ID)
+          'listing_id': item['product_id'], // App uchun product_listings.id (har doim to'g'ri bog'lanadi)
+          'product_name': item['product_name'],
+          'sku': item['sku'],
           'quantity': item['quantity'],
           'price_at_time': item['price'],
         };
@@ -283,7 +317,7 @@ class SupabaseService {
 
       final response = await client
           .from('orders')
-          .select('*, order_items(*, product_listings(*))')
+          .select('*, order_items(*, product_listings!listing_id(*))')
           .eq('user_id', userId)
           .order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
@@ -435,7 +469,7 @@ class SupabaseService {
       final response = await client
           .from('announcements')
           .select()
-          .order('created_at', ascending: true);
+          .order('created_at', ascending: false);
       
       final List<Map<String, dynamic>> result = [];
       for (var row in response) {

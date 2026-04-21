@@ -129,6 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'image': imageUrl ?? '',
               'images': rawImages is List ? rawImages : (imageUrl != null ? [imageUrl] : []),
               'unit': raw['unit']?.toString() ?? productData?['unit']?.toString() ?? 'ta',
+              'sku': raw['sku']?.toString() ?? productData?['sku']?.toString() ?? '',
               'original_category': raw['category'] ?? productData?['category'] ?? '',
               'created_at': raw['created_at'],
             };
@@ -622,6 +623,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               images: product['images'],
                               discountBadge: product['discountBadge'],
                               unit: product['unit'],
+                              sku: product['sku'],
                             );
                             TopNotification.show(context, context.read<LocalizationProvider>().translate('savatga_qoshildi'));
                           },

@@ -115,6 +115,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                       : null,
               'isDiscounted': (raw['discount_percent'] != null && raw['discount_percent'].toString() != '0') || (oldPrice > price && price > 0),
               'unit': raw['unit']?.toString() ?? 'ta',
+              'sku': raw['sku']?.toString() ?? '',
             };
           }).toList();
           _filteredProducts = _allProducts;
@@ -445,6 +446,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                               images: product['images'],
                               discountBadge: product['discountBadge'],
                               unit: product['unit'],
+                              sku: product['sku'],
                             );
                             TopNotification.show(context, context.read<LocalizationProvider>().translate('savatga_qoshildi'));
                           },

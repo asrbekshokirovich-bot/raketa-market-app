@@ -29,6 +29,17 @@ class OrderItem {
   OrderItem({required this.name, required this.imageUrl, required this.qty, required this.price, this.isDiscounted = false});
 }
 
+int mapStatusToStep(String? status) {
+  if (status == null) return 0;
+  final s = status.toLowerCase();
+  if (s.contains('yangi') || s == 'pending' || s == 'waiting') return 0;
+  if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') return 1;
+  if (s == 'packed' || s.contains('tayyor') || s == 'ready') return 2;
+  if (s.contains('yo\'lda') || s == 'delivering' || s == 'ontheway') return 3;
+  if (s.contains('yetkazildi') || s == 'delivered') return 4;
+  return 0;
+}
+
 class OrderModel {
   final String id;
   final String rawId;
@@ -44,6 +55,7 @@ class OrderModel {
   final String courierCode;
   final double deliveryFee;
   final double discountAmount;
+  final String coordinates;
 
   OrderModel({
     required this.id, required this.rawId, required this.date, required this.status, required this.currentStep,
@@ -52,6 +64,7 @@ class OrderModel {
     required this.courierCode,
     this.deliveryFee = 0.0,
     this.discountAmount = 0.0,
+    this.coordinates = '',
   });
 }
 
@@ -80,12 +93,13 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
 
   void _setupRealtime() {
     _subscription = Supabase.instance.client
-      .channel('public:orders')
+      .channel('orders_realtime')
       .onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'orders',
         callback: (payload) {
+          debugPrint('REALTIME UPDATE RECEIVED: ${payload.eventType}');
           _loadOrders(silent: true);
         }
       ).subscribe();
@@ -120,7 +134,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 : raw['status'] == 'Picking' ? 'Tayyorlanmoqda'
                 : raw['status'] == 'Packed' ? 'Tayyor'
                 : raw['status'] ?? 'Yangi').toString(),
-            currentStep: _mapStatusToStep(raw['status']?.toString()),
+            currentStep: mapStatusToStep(raw['status']?.toString()),
             totalAmount: double.tryParse((raw['total_amount'] ?? '0').toString()) ?? 0.0,
             customerName: (raw['full_name'] ?? '').toString(),
             phone: (raw['customer_phone'] ?? '').toString(),
@@ -129,6 +143,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             courierCode: (raw['courier_code'] ?? 'Kutilyapti').toString(),
             deliveryFee: double.tryParse((raw['delivery_fee'] ?? '0').toString()) ?? 0.0,
             discountAmount: double.tryParse((raw['discount_amount'] ?? '0').toString()) ?? 0.0,
+            coordinates: (raw['coordinates'] ?? '').toString(),
             items: itemsRaw.map((i) {
               final itemMap = (i as Map?) ?? {};
               final product = (itemMap['product_listings'] ?? itemMap['products'] ?? {}) as Map;
@@ -150,16 +165,6 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     }
   }
 
-  int _mapStatusToStep(String? status) {
-    if (status == null) return 0;
-    final s = status.toLowerCase();
-    if (s.contains('yangi') || s == 'pending') return 0;
-    if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') return 1;
-    if (s == 'packed' || s.contains('tayyor')) return 2;
-    if (s.contains('yo\'lda') || s == 'delivering') return 3;
-    if (s.contains('yetkazildi') || s == 'delivered') return 4;
-    return 0;
-  }
 
 
 
@@ -337,6 +342,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 _buildInfoRow(_t(context, 'telefon_raqami', "Telefon raqami:"), order.phone, isDark),
                 const SizedBox(height: 8),
                 _buildInfoRow(_t(context, 'manzil', "Manzil:"), _getPureAddress(order.address), isDark),
+                const SizedBox(height: 8),
+                if (order.coordinates.isNotEmpty) 
+                  _buildInfoRow(_t(context, 'kordinatalar', "Kordinatalar:"), order.coordinates, isDark, valueColor: Colors.blue[600]),
                 
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
@@ -577,13 +585,7 @@ class OrderDetailsScreen extends StatelessWidget {
           if (snapshot.hasData && snapshot.data!.isNotEmpty) {
             final rawData = snapshot.data!.first;
             final rawStatus = rawData['status'] as String?;
-            final s = (rawStatus ?? "").toLowerCase();
-            if (s.contains('yangi') || s == 'pending') {
-              step = 0;
-            } else if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') step = 1;
-            else if (s == 'packed' || s == 'waiting' || s.contains('tayyor')) step = 2;
-            else if (s.contains('yo\'lda') || s == 'ontheway' || s == 'delivering') step = 3;
-            else if (s.contains('yetkazildi') || s == 'delivered') step = 4;
+            step = mapStatusToStep(rawStatus);
 
             final cCode = rawData['courier_code']?.toString();
             if (cCode != null && cCode.trim().isNotEmpty) {
@@ -1075,17 +1077,27 @@ class _CancelOrderWidgetState extends State<CancelOrderWidget> {
 }
 
 String _getPureAddress(String address) {
-  int koordIndex = address.indexOf('(Koord:');
+  // Avval kuryer izohini (newline dan keyingi qismni) olib tashlaymiz
+  String cleanAddr = address.split('\n')[0].trim();
+  
+  int koordIndex = cleanAddr.indexOf('(Koord:');
   if (koordIndex != -1) {
-    int closeParenIndex = address.indexOf(')', koordIndex);
+    int closeParenIndex = cleanAddr.indexOf(')', koordIndex);
     if (closeParenIndex != -1) {
-      return address.substring(0, closeParenIndex + 1).trim();
+      return cleanAddr.substring(0, closeParenIndex + 1).trim();
     }
   }
-  return address;
+  return cleanAddr;
 }
 
 String _getCourierNote(String address) {
+  // Newline dan keyingi qism kuryer tavsifi deb hisoblanadi
+  final parts = address.split('\n');
+  if (parts.length > 1) {
+    return parts.sublist(1).join('\n').trim();
+  }
+  
+  // Eskicha format bo'lsa (Koord dan keyingi qism)
   int koordIndex = address.indexOf('(Koord:');
   if (koordIndex != -1) {
     int closeParenIndex = address.indexOf(')', koordIndex);

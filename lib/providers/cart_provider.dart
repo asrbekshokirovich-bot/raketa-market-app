@@ -13,6 +13,7 @@ class CartItem {
   final String unit;
   int quantity;
   bool isSelected;
+  final String? sku;
 
   CartItem({
     required this.id,
@@ -26,6 +27,7 @@ class CartItem {
     this.unit = 'ta',
     this.quantity = 1,
     this.isSelected = true,
+    this.sku,
   });
 }
 
@@ -164,6 +166,7 @@ class CartProvider with ChangeNotifier {
             unit: product['unit'] ?? 'ta',
             quantity: item['quantity'] ?? 1,
             isSelected: wasSelected,
+            sku: product['sku']?.toString(),
             discountBadge: (product['discount_percent'] != null && product['discount_percent'].toString() != '0')
                 ? '${product['discount_percent']}% CHEGIRMA'
                 : (oldPriceVal > priceVal && priceVal > 0)
@@ -203,6 +206,7 @@ class CartProvider with ChangeNotifier {
           unit: existing.unit,
           quantity: existing.quantity,
           isSelected: !existing.isSelected,
+          sku: existing.sku,
         ),
       );
       notifyListeners();
@@ -219,6 +223,7 @@ class CartProvider with ChangeNotifier {
     List<dynamic>? images,
     String? discountBadge,
     String? unit,
+    String? sku,
   }) async {
     debugPrint('--- CART_PROVIDER: ADDING ITEM $productId ---');
     int newQuantity = 1;
@@ -238,6 +243,7 @@ class CartProvider with ChangeNotifier {
           unit: existing.unit,
           quantity: newQuantity,
           isSelected: existing.isSelected,
+          sku: existing.sku,
         ),
       );
     } else {
@@ -255,6 +261,7 @@ class CartProvider with ChangeNotifier {
           unit: unit ?? 'ta',
           quantity: 1,
           isSelected: true,
+          sku: sku,
         ),
       );
     }
@@ -292,6 +299,7 @@ class CartProvider with ChangeNotifier {
           unit: existing.unit,
           quantity: newQuantity,
           isSelected: existing.isSelected,
+          sku: existing.sku,
         ),
       );
       notifyListeners();

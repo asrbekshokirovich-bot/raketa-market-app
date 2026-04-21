@@ -129,7 +129,7 @@ class LocalizationProvider with ChangeNotifier {
       'phone_number': 'Telefon raqam',
       'receive_method': 'Qabul qilish usuli',
       'delivery': 'Yetkazib berish (Dastavka)',
-      'pickup': 'Borib olib ketish (Samovivoz)',
+      'pickup': 'Borib olib ketish (Tez kunda)',
       'your_address': 'Manzilingiz',
       'searching_address': 'Manzil qidirilmoqda...',
       'unknown_area': 'Noaniq hudud',
@@ -170,6 +170,8 @@ class LocalizationProvider with ChangeNotifier {
       'checkout_success': 'Muvaffaqiyatli rasmiylashtirdingiz!',
       'checkout_error': 'Xatolik yuz berdi. Iltimos qaytadan urinib ko\'ring.',
       'confirm_order': 'Buyurtmani tasdiqlash',
+      'delivery_promo_free': 'Yana %s %s xarid qiling va bepul yetkazib berishga ega bo\'ling!',
+      'delivery_promo_tier': 'Yana %s %s xarid qiling va yetkazib berish narxini %s %sga tushiring!',
 
       // --- Login & SMS Screens ---
       'login_title': 'Tizimga kirish',
@@ -450,7 +452,7 @@ class LocalizationProvider with ChangeNotifier {
       'phone_number': 'Номер телефона',
       'receive_method': 'Способ получения',
       'delivery': 'Доставка',
-      'pickup': 'Самовывоз',
+      'pickup': 'Самовывоз (Скоро)',
       'your_address': 'Ваш адрес',
       'searching_address': 'Поиск адреса...',
       'unknown_area': 'Неизвестная зона',
@@ -491,6 +493,8 @@ class LocalizationProvider with ChangeNotifier {
       'checkout_success': 'Успешно оформлено!',
       'checkout_error': 'Произошла ошибка. Пожалуйста, попробуйте еще раз.',
       'confirm_order': 'Подтвердить заказ',
+      'delivery_promo_free': 'Купите еще на %s %s и получите бесплатную доставку!',
+      'delivery_promo_tier': 'Купите еще на %s %s и снизьте стоимость доставки до %s %s!',
 
       // --- Login & SMS Screens ---
       'login_title': 'Вход в систему',
@@ -797,7 +801,7 @@ class LocalizationProvider with ChangeNotifier {
       'phone_number': 'Phone Number',
       'receive_method': 'Receive Method',
       'delivery': 'Delivery',
-      'pickup': 'Pickup',
+      'pickup': 'Pickup (Coming soon)',
       'your_address': 'Your Address',
       'searching_address': 'Searching address...',
       'unknown_area': 'Unknown area',
@@ -838,6 +842,8 @@ class LocalizationProvider with ChangeNotifier {
       'checkout_success': 'Successfully checked out!',
       'checkout_error': 'An error occurred. Please try again.',
       'confirm_order': 'Confirm Order',
+      'delivery_promo_free': 'Buy for %s %s more and get free delivery!',
+      'delivery_promo_tier': 'Buy for %s %s more and lower the delivery price to %s %s!',
 
       // --- Checkout & Orders ---
       'chiqish_tasdiq': 'Are you sure you want to log out?',

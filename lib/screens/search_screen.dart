@@ -186,6 +186,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       : null,
               'isDiscounted': (raw['discount_percent'] != null && raw['discount_percent'].toString() != '0') || (oldPrice > price && price > 0),
               'unit': raw['unit']?.toString() ?? 'ta',
+              'sku': raw['sku']?.toString() ?? '',
             };
           }).toList();
         });
@@ -241,6 +242,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           : (oldPrice > price && price > 0) ? '${((oldPrice - price) / oldPrice * 100).round()}% CHEGIRMA' : null,
                       'isDiscounted': (raw['discount_percent'] != null && raw['discount_percent'].toString() != '0') || (oldPrice > price && price > 0),
                       'unit': raw['unit']?.toString() ?? 'ta',
+                      'sku': raw['sku']?.toString() ?? '',
                     };
                     
                     if (!grouped.containsKey(cat)) {
@@ -782,6 +784,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                 images: product['images'],
                                 discountBadge: product['discountBadge'],
                                 unit: product['unit'],
+                                sku: product['sku'],
                               );
                               TopNotification.show(context, context.read<LocalizationProvider>().translate('savatga_qoshildi'));
                             }
