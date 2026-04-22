@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/localization_provider.dart';
 import '../utils/top_toast.dart';
+import '../main.dart';
 import 'dart:math' as math;
 
 String _fC(dynamic amount) {
@@ -32,11 +33,14 @@ class OrderItem {
 int mapStatusToStep(String? status) {
   if (status == null) return 0;
   final s = status.toLowerCase();
-  if (s.contains('yangi') || s == 'pending' || s == 'waiting') return 0;
-  if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') return 1;
-  if (s == 'packed' || s.contains('tayyor') || s == 'ready') return 2;
-  if (s.contains('yo\'lda') || s == 'delivering' || s == 'ontheway') return 3;
-  if (s.contains('yetkazildi') || s == 'delivered') return 4;
+  
+  if (s == 'pending' || s.contains('yangi')) return 0;
+  if (s == 'picking' || s.contains('qabul') || s.contains('tayyorlanmoqda')) return 1;
+  if (s == 'waiting' || s.contains('kutilmoqda')) return 2;
+  if (s == 'ontheway' || s.contains('yo\'lda') || s == 'delivering') return 3;
+  if (s == 'delivered' || s.contains('yetkazildi')) return 4;
+  if (s == 'cancelled' || s.contains('bekor')) return -1;
+  
   return 0;
 }
 
@@ -133,6 +137,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 : raw['status'] == 'Accepted' ? 'Qabul qilingan'
                 : raw['status'] == 'Picking' ? 'Tayyorlanmoqda'
                 : raw['status'] == 'Packed' ? 'Tayyor'
+                : raw['status'] == 'Cancelled' ? 'Bekor qilindi'
                 : raw['status'] ?? 'Yangi').toString(),
             currentStep: mapStatusToStep(raw['status']?.toString()),
             totalAmount: double.tryParse((raw['total_amount'] ?? '0').toString()) ?? 0.0,
@@ -161,6 +166,8 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         }).toList();
 
         _isLoading = false;
+        // Global countni yangilash (faqat haqiqiy yangi buyurtmalarni sanaymiz)
+        newOrdersCountNotifier.value = _orders.where((o) => o.currentStep < 4 && o.currentStep != -1).length;
       });
     }
   }
@@ -178,8 +185,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       );
     }
 
-    final newOrders = _orders.where((o) => o.currentStep < 4).toList();
-    final deliveredOrders = _orders.where((o) => o.currentStep >= 4).toList();
+    final newOrders = _orders.where((o) => o.currentStep < 4 && o.currentStep != -1).toList();
+    final allOrders = _orders.where((o) => o.currentStep == 4 || o.currentStep == -1).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFEEEEEE),
@@ -206,7 +214,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           unselectedLabelStyle: GoogleFonts.montserrat(fontWeight: FontWeight.w600, fontSize: 14),
           tabs: [
             Tab(text: context.watch<LocalizationProvider>().translate('yangi_tab')),
-            Tab(text: context.watch<LocalizationProvider>().translate('yetkazilgan_tab')),
+            Tab(text: context.watch<LocalizationProvider>().translate('hammasi_tab')),
           ],
         ),
       ),
@@ -214,7 +222,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         controller: _tabController,
         children: [
           _buildOrderList(newOrders, isDark),
-          _buildOrderList(deliveredOrders, isDark),
+          _buildOrderList(allOrders, isDark),
         ],
       ),
     );
@@ -257,10 +265,13 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         } else if (order.status == 'Qabul qilingan') trKey = 'qabul_qilingan';
         else if (order.status == 'Tayyorlanmoqda') trKey = 'tayyorlanmoqda';
         else if (order.status == 'Tayyor' || order.status == 'Yetkazib berilgan') trKey = 'yetkazilgan';
+        else if (order.currentStep == -1) trKey = 'cancelled_badge';
 
         Color sColor = (trKey == 'yetkazilgan') 
             ? Colors.green 
-            : (isDark ? Colors.white : Colors.black87);
+            : (order.currentStep == -1)
+                ? Colors.red
+                : (isDark ? Colors.white : Colors.black87);
 
         return Container(
             padding: const EdgeInsets.all(16),
@@ -444,47 +455,34 @@ class OrderDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildStepper(BuildContext context, int currentStep, bool isDark, String courierCode) {
-    // currentStep: 0=Pending, 1=Picking, 2=Waiting, 3=OnTheWay, 4=Delivered
+    bool isCancelled = currentStep == -1;
+    // currentStep: 0=Pending, 1=Picking, 2=Waiting, 3=OnTheWay, 4=Delivered, -1=Cancelled
     return Column(
-      children: List.generate(4, (index) {
+      children: List.generate(5, (index) {
         bool isCompleted = index < currentStep;
         bool isCurrent = index == currentStep;
         
-        // Wait, if currentStep == 3 (OnTheWay), index 2 should be considered completed, and index 3 is current!
-        // If currentStep == 4 (Delivered), all 4 are completed!
-        if (currentStep == 3 && index == 2) {
-          isCompleted = true;
-          isCurrent = false;
-        } else if (currentStep == 3 && index == 3) {
-          isCompleted = false;
-          isCurrent = true;
-        }
-        
-        // Match specific rules
+        // Handle final state
         if (currentStep == 4) {
           isCompleted = true;
           isCurrent = false;
         }
 
-        bool isLast = index == 3;
-        final activeColor = isCompleted ? Colors.green : (isDark ? Colors.white : Colors.black87);
-        final bool isCardActive = isCompleted || isCurrent;
+        bool isLast = index == 4;
+        final activeColor = isCancelled ? Colors.red : (isCompleted ? Colors.green : (isDark ? Colors.white : Colors.black87));
+        final bool isCardActive = isCompleted || isCurrent || isCancelled;
         
         String stepText = "";
         if (index == 0) {
-          stepText = isCompleted ? "Qabul qilingan" : (isCurrent ? "Qabul qilish kutilmoqda" : "Qabul qilinishi kutilmoqda");
+          stepText = isCompleted ? "Qabul qilingan" : (isCurrent ? "Qabul qilish kutilmoqda" : "Qabul qilingan");
         } else if (index == 1) {
-          stepText = isCompleted ? "Tayyor" : (isCurrent ? "Tayyorlanmoqda" : "Tayyor");
+          stepText = isCompleted ? "Tayyor" : (isCurrent ? "Tayyorlanmoqda" : "Tayyorlanmoqda");
         } else if (index == 2) {
-          if (currentStep < 2) {
-            stepText = "Yo'lda";
-          } else if (currentStep == 2) stepText = "Kuryer kutilmoqda";
-          else stepText = "Kuryerga berildi";
+          stepText = isCompleted ? "Kuryerga berildi" : (isCurrent ? "Kuryer kutilmoqda" : "Kuryer kutilmoqda");
         } else if (index == 3) {
-          if (currentStep < 3) {
-            stepText = "Yetkazildi";
-          } else if (currentStep == 3) stepText = "Yo'lda";
-          else stepText = "Yetkazildi";
+          stepText = isCompleted ? "Yo'lda" : (isCurrent ? "Yo'lda" : "Yo'lda");
+        } else if (index == 4) {
+          stepText = isCompleted ? "Yetkazildi" : (isCurrent ? "Yetkazildi" : "Yetkazildi");
         }
 
         final finalText = _t(context, stepText, stepText);
@@ -514,7 +512,7 @@ class OrderDetailsScreen extends StatelessWidget {
                     height: 36,
                     margin: const EdgeInsets.symmetric(vertical: 4),
                     decoration: BoxDecoration(
-                      color: isCompleted ? Colors.green : (isDark ? Colors.grey[800] : Colors.grey[200]),
+                      color: isCancelled ? Colors.red : (isCompleted ? Colors.green : (isDark ? Colors.grey[800] : Colors.grey[200])),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -540,7 +538,7 @@ class OrderDetailsScreen extends StatelessWidget {
                         fontSize: 14,
                       ),
                     ),
-                    if (index == 2 && isCurrent && courierCode != 'Kutilyapti') ...[
+                    if ((index == 2 || index == 3) && isCurrent && courierCode != 'Kutilyapti') ...[
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -621,9 +619,27 @@ class OrderDetailsScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       _buildStepper(context, step, isDark, liveCourierCode),
                       
-                      if (step < 2) ...[
+                      if (step >= 0 && step < 2) ...[
                         const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
                         CancelOrderWidget(orderId: order.rawId, isDark: isDark),
+                      ],
+                      if (step == -1) ...[
+                        const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          width: double.infinity,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.cancel_outlined, color: Colors.red, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                _t(context, 'cancelled_badge', "Bekor qilindi"),
+                                style: GoogleFonts.montserrat(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ],
                   ),

@@ -332,9 +332,34 @@ class SupabaseService {
     try {
       final response = await client
           .from('cart_items')
-          .select('*, product_listings(*)')
+          .select('*, product_listings:product_id!inner(*)') // First join product_listings
           .eq('user_id', userId);
-      return List<Map<String, dynamic>>.from(response);
+      
+      final cartItems = List<Map<String, dynamic>>.from(response);
+      if (cartItems.isEmpty) return [];
+
+      // Now we need the stock data from the view for each product
+      final productIds = cartItems.map((e) => e['product_id'].toString()).toSet().toList();
+      final stockDataResponse = await client
+          .from('vw_product_listings_with_stock')
+          .select('id, stock, min_stock')
+          .inFilter('id', productIds);
+      
+      final stockMap = { for (var item in stockDataResponse) item['id'].toString() : item };
+
+      // Merge stock data back into the product list
+      for (var item in cartItems) {
+        if (item['product_listings'] != null) {
+          final pId = item['product_id'].toString();
+          final stockInfo = stockMap[pId];
+          if (stockInfo != null) {
+            item['product_listings']['stock'] = stockInfo['stock'];
+            item['product_listings']['min_stock'] = stockInfo['min_stock'];
+          }
+        }
+      }
+
+      return cartItems;
     } catch (e) {
       print('Savatni yuklashda xatolik: $e');
       return [];

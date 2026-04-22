@@ -99,7 +99,9 @@ class AuthProvider with ChangeNotifier {
           _userProfile = insertResponse;
         } else {
           _isLoading = false;
-          notifyListeners();
+        // Global countni yangilash
+        newOrdersCountNotifier.value = 0;
+    notifyListeners();
           return false;
         }
       }
@@ -156,13 +158,21 @@ class AuthProvider with ChangeNotifier {
         if (status == null) continue;
         final s = status.toLowerCase();
         int step = 0;
-        if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') {
+        if (s.contains('bekor') || s == 'cancelled') {
+          step = -1;
+        } else if (s.contains('yangi') || s == 'pending' || s == 'waiting') {
+          step = 0;
+        } else if (s.contains('qabul') || s == 'accepted' || s.contains('tayyorlanmoqda') || s == 'picking') {
           step = 1;
-        } else if (s == 'packed' || s.contains('tayyor')) step = 2;
-        else if (s.contains('yo\'lda') || s == 'delivering') step = 3;
-        else if (s.contains('yetkazildi') || s == 'delivered') step = 4;
+        } else if (s == 'packed' || s.contains('tayyor') || s == 'ready') {
+          step = 2;
+        } else if (s.contains('yo\'lda') || s == 'delivering' || s == 'ontheway') {
+          step = 3;
+        } else if (s.contains('yetkazildi') || s == 'delivered') {
+          step = 4;
+        }
         
-        if (step < 4) activeCount++;
+        if (step >= 0 && step < 4) activeCount++;
       }
       newOrdersCountNotifier.value = activeCount;
     } catch(e) {

@@ -126,7 +126,7 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       // Qidiruvni ancha moslashuvchan qilish (Har bir so'z bo'yicha)
       final response = await SupabaseService.client
-          .from('product_listings')
+          .from('vw_product_listings_with_stock')
           .select()
           .eq('status', 'Active')
           .ilike('name', '%$query%')
@@ -187,6 +187,8 @@ class _SearchScreenState extends State<SearchScreen> {
               'isDiscounted': (raw['discount_percent'] != null && raw['discount_percent'].toString() != '0') || (oldPrice > price && price > 0),
               'unit': raw['unit']?.toString() ?? 'ta',
               'sku': raw['sku']?.toString() ?? '',
+              'stock': int.tryParse(raw['stock']?.toString() ?? '0') ?? 0,
+              'min_stock': int.tryParse(raw['min_stock']?.toString() ?? '10') ?? 10,
             };
           }).toList();
         });
@@ -200,7 +202,7 @@ class _SearchScreenState extends State<SearchScreen> {
               
           if (targetCategories.isNotEmpty) {
              final relatedResp = await SupabaseService.client
-                 .from('product_listings')
+                 .from('vw_product_listings_with_stock')
                  .select()
                  .eq('status', 'Active')
                  .filter('category', 'in', targetCategories.toList())
@@ -243,6 +245,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       'isDiscounted': (raw['discount_percent'] != null && raw['discount_percent'].toString() != '0') || (oldPrice > price && price > 0),
                       'unit': raw['unit']?.toString() ?? 'ta',
                       'sku': raw['sku']?.toString() ?? '',
+                      'stock': int.tryParse(raw['stock']?.toString() ?? '0') ?? 0,
+                      'min_stock': int.tryParse(raw['min_stock']?.toString() ?? '10') ?? 10,
                     };
                     
                     if (!grouped.containsKey(cat)) {

@@ -38,7 +38,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
   Future<void> _fetchProducts() async {
     try {
       dynamic query = SupabaseService.client
-          .from('product_listings')
+          .from('vw_product_listings_with_stock')
           .select()
           .eq('status', 'Active');
 
@@ -116,6 +116,8 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
               'isDiscounted': (raw['discount_percent'] != null && raw['discount_percent'].toString() != '0') || (oldPrice > price && price > 0),
               'unit': raw['unit']?.toString() ?? 'ta',
               'sku': raw['sku']?.toString() ?? '',
+              'stock': int.tryParse(raw['stock']?.toString() ?? '0') ?? 0,
+              'min_stock': int.tryParse(raw['min_stock']?.toString() ?? '10') ?? 10,
             };
           }).toList();
           _filteredProducts = _allProducts;

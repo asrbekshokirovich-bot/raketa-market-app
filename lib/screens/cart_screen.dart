@@ -140,6 +140,9 @@ class CartScreen extends StatelessWidget {
                                   'images': cartItem.images,
                                   'discountBadge': cartItem.discountBadge,
                                   'isDiscounted': cartItem.oldPrice != null,
+                                  'sku': cartItem.sku,
+                                  'stock': cartItem.stock,
+                                  'min_stock': cartItem.min_stock,
                                 },
                               onNavigate,
                               isFromCart: true,
@@ -332,6 +335,9 @@ class CartScreen extends StatelessWidget {
                                             images: cartItem.images,
                                             discountBadge: cartItem.discountBadge,
                                             unit: cartItem.unit,
+                                            sku: cartItem.sku,
+                                            stock: cartItem.stock,
+                                            min_stock: cartItem.min_stock,
                                           );
                                         },
                                         child: Container(

@@ -60,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       _bannersKey.currentState?.reloadBanners();
       final response = await SupabaseService.client
-          .from('product_listings')
+          .from('vw_product_listings_with_stock')
           .select()
           .eq('status', 'Active')
           .order('created_at', ascending: false);
@@ -132,6 +132,8 @@ class _HomeScreenState extends State<HomeScreen> {
               'sku': raw['sku']?.toString() ?? productData?['sku']?.toString() ?? '',
               'original_category': raw['category'] ?? productData?['category'] ?? '',
               'created_at': raw['created_at'],
+              'stock': int.tryParse(raw['stock']?.toString() ?? '0') ?? 0,
+              'min_stock': int.tryParse(raw['min_stock']?.toString() ?? '10') ?? 10,
             };
           }).toList();
 

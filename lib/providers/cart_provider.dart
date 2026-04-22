@@ -14,6 +14,8 @@ class CartItem {
   int quantity;
   bool isSelected;
   final String? sku;
+  final int stock;
+  final int min_stock;
 
   CartItem({
     required this.id,
@@ -28,6 +30,8 @@ class CartItem {
     this.quantity = 1,
     this.isSelected = true,
     this.sku,
+    this.stock = 0,
+    this.min_stock = 10,
   });
 }
 
@@ -167,6 +171,8 @@ class CartProvider with ChangeNotifier {
             quantity: item['quantity'] ?? 1,
             isSelected: wasSelected,
             sku: product['sku']?.toString(),
+            stock: int.tryParse(product['stock']?.toString() ?? '0') ?? 0,
+            min_stock: int.tryParse(product['min_stock']?.toString() ?? '10') ?? 10,
             discountBadge: (product['discount_percent'] != null && product['discount_percent'].toString() != '0')
                 ? '${product['discount_percent']}% CHEGIRMA'
                 : (oldPriceVal > priceVal && priceVal > 0)
@@ -207,6 +213,8 @@ class CartProvider with ChangeNotifier {
           quantity: existing.quantity,
           isSelected: !existing.isSelected,
           sku: existing.sku,
+          stock: existing.stock,
+          min_stock: existing.min_stock,
         ),
       );
       notifyListeners();
@@ -224,6 +232,8 @@ class CartProvider with ChangeNotifier {
     String? discountBadge,
     String? unit,
     String? sku,
+    int stock = 0,
+    int min_stock = 10,
   }) async {
     debugPrint('--- CART_PROVIDER: ADDING ITEM $productId ---');
     int newQuantity = 1;
@@ -244,6 +254,8 @@ class CartProvider with ChangeNotifier {
           quantity: newQuantity,
           isSelected: existing.isSelected,
           sku: existing.sku,
+          stock: existing.stock,
+          min_stock: existing.min_stock,
         ),
       );
     } else {
@@ -262,6 +274,8 @@ class CartProvider with ChangeNotifier {
           quantity: 1,
           isSelected: true,
           sku: sku,
+          stock: stock,
+          min_stock: min_stock,
         ),
       );
     }
@@ -300,6 +314,8 @@ class CartProvider with ChangeNotifier {
           quantity: newQuantity,
           isSelected: existing.isSelected,
           sku: existing.sku,
+          stock: existing.stock,
+          min_stock: existing.min_stock,
         ),
       );
       notifyListeners();
